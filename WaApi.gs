@@ -10,30 +10,30 @@ var WA_TIMEOUT_MS = 270000; // 4.5 minutes
 /**
  * Build UrlFetchApp options for WA API calls.
  * @param {string} method HTTP method.
- * @param {Object|null} body Request body.
+ * @param {Object|null} payload Request payload (ignored for GET).
  * @return {Object} UrlFetchApp options.
  */
-function buildFetchOptions(method, body) {
+function buildFetchOptions(method, payload) {
   var config = loadConfig();
   var options = {
     method: method,
-    contentType: 'application/json',
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
+    headers: {
+      'Accept': 'application/json'
+    }
   };
 
-  if (body) {
-    options.payload = JSON.stringify(body);
+  // Only add payload for non-GET methods
+  if (payload && method.toLowerCase() !== 'get') {
+    options.contentType = 'application/json';
+    options.payload = JSON.stringify(payload);
   }
 
-  var headers = {};
-  var authUser = config.WA_API_BASIC_AUTH_USER || '';
-  var authPass = config.WA_API_BASIC_AUTH_PASS || '';
-  if (authUser) {
-    headers['Authorization'] = 'Basic ' + Utilities.base64Encode(authUser + ':' + authPass);
+  var user = config.WA_API_BASIC_AUTH_USER || '';
+  var pass = config.WA_API_BASIC_AUTH_PASS || '';
+  if (user && pass) {
+    options.headers['Authorization'] = 'Basic ' + Utilities.base64Encode(user + ':' + pass);
   }
-
-  var timeout = Number(config.WA_API_TIMEOUT_MS || 10000);
-  options.headers = headers;
 
   return options;
 }
@@ -48,20 +48,39 @@ function testWaConnection() {
 
   try {
     var options = buildFetchOptions('get', null);
-    var response = UrlFetchApp.fetch(baseUrl + '/app/devices', options);
-    var code = response.getResponseCode();
-    var body = JSON.parse(response.getContentText());
 
-    if (code === 200 && body.code === 200) {
+    // Try GET /app/status first (Connection Status)
+    try {
+      var response = UrlFetchApp.fetch(baseUrl + '/app/status', options);
+      var code = response.getResponseCode();
+      var body = JSON.parse(response.getContentText());
+
+      if (code === 200) {
+        return JSON.stringify({
+          success: true,
+          message: 'Connected to WA API',
+          devices: body.results || body
+        });
+      }
+    } catch (e1) {
+      // /app/status failed, try fallback
+    }
+
+    // Fallback: GET /devices
+    var response2 = UrlFetchApp.fetch(baseUrl + '/devices', options);
+    var code2 = response2.getResponseCode();
+    var body2 = JSON.parse(response2.getContentText());
+
+    if (code2 === 200) {
       return JSON.stringify({
         success: true,
-        message: 'Connected to WA API',
-        devices: body.results || null
+        message: 'Connected to WA API (via /devices)',
+        devices: body2.results || body2
       });
     } else {
       return JSON.stringify({
         success: false,
-        message: 'WA API returned code ' + code + ': ' + (body.message || ''),
+        message: 'WA API returned code ' + code2 + ': ' + (body2.message || ''),
         devices: null
       });
     }
@@ -94,16 +113,29 @@ function checkWhatsAppNumber(phone) {
   var baseUrl = config.WA_API_BASE_URL || 'http://localhost:3000';
 
   try {
-    var options = buildFetchOptions('post', { phone: normalized });
-    var response = UrlFetchApp.fetch(baseUrl + '/user/check', options);
+    var options = buildFetchOptions('get', null);
+    var response = UrlFetchApp.fetch(baseUrl + '/user/check?phone=' + encodeURIComponent(normalized), options);
+    var code = response.getResponseCode();
     var body = JSON.parse(response.getContentText());
 
-    if (body.results && body.results.is_registered === true) {
-      return { status: 'active', jid: body.results.jid || '' };
-    } else if (body.results && body.results.is_registered === false) {
-      return { status: 'inactive' };
+    if (code === 200 && body.code === 200) {
+      var isRegistered = false;
+      if (body.results) {
+        if (typeof body.results.is_registered !== 'undefined') {
+          isRegistered = body.results.is_registered;
+        } else if (typeof body.results.registered !== 'undefined') {
+          isRegistered = body.results.registered;
+        } else if (body.results.jid) {
+          isRegistered = true;
+        }
+      }
+      return {
+        status: isRegistered ? 'active' : 'inactive',
+        message: body.message || (isRegistered ? 'Registered' : 'Not registered'),
+        jid: (body.results && body.results.jid) ? body.results.jid : null
+      };
     } else {
-      return { status: 'error', message: 'Unexpected response: ' + response.getContentText() };
+      return { status: 'error', message: 'API returned code ' + code + ': ' + (body.message || response.getContentText()) };
     }
   } catch (e) {
     logAction('', 'waCheck', 'error', 'WA check failed for ' + normalized, e.toString());

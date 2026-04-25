@@ -19,7 +19,7 @@ var CONFIG_DEFAULTS = {
   DRY_RUN_DEFAULT: 'true',
   DEBUG_MODE: 'false',
   WA_API_ENABLED: 'false',
-  WA_API_BASE_URL: 'http://localhost:3000',
+  WA_API_BASE_URL: '',
   WA_API_TIMEOUT_MS: '10000',
   WA_API_BASIC_AUTH_USER: '',
   WA_API_BASIC_AUTH_PASS: '',
