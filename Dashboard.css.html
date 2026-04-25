@@ -1,0 +1,450 @@
+<style>
+  /* === Base Reset === */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    color: #333;
+    background: #f5f7fa;
+    line-height: 1.5;
+  }
+
+  /* === Layout === */
+  .app-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  .app-header {
+    background: #1a73e8;
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 0;
+  }
+
+  .app-header h1 {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .app-header p {
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+
+  /* === Tabs === */
+  .tab-nav {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid #e0e0e0;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: 10px 18px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .tab-btn:hover {
+    color: #1a73e8;
+  }
+
+  .tab-btn.active {
+    color: #1a73e8;
+    border-bottom-color: #1a73e8;
+  }
+
+  .tab-content {
+    display: none;
+    background: #fff;
+    padding: 20px;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  /* === Cards === */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .card-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a73e8;
+  }
+
+  .card-label {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+  }
+
+  /* === Buttons === */
+  .btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: #1a73e8;
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #1557b0;
+  }
+
+  .btn-success {
+    background: #34a853;
+    color: #fff;
+  }
+
+  .btn-success:hover:not(:disabled) {
+    background: #2d8f47;
+  }
+
+  .btn-danger {
+    background: #ea4335;
+    color: #fff;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #c5352a;
+  }
+
+  .btn-secondary {
+    background: #e8eaed;
+    color: #333;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: #d2d5d9;
+  }
+
+  .btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+  }
+
+  /* === Tables === */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    background: #f8f9fa;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 2px solid #e0e0e0;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+  }
+
+  tr:hover {
+    background: #f8f9fa;
+  }
+
+  /* === Status Badges === */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .badge-green {
+    background: #e6f4ea;
+    color: #137333;
+  }
+
+  .badge-red {
+    background: #fce8e6;
+    color: #c5221f;
+  }
+
+  .badge-gray {
+    background: #f1f3f4;
+    color: #5f6368;
+  }
+
+  .badge-yellow {
+    background: #fef7e0;
+    color: #b06000;
+  }
+
+  /* === Status Dots === */
+  .status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .dot-green { background: #34a853; }
+  .dot-red { background: #ea4335; }
+  .dot-gray { background: #9aa0a6; }
+  .dot-yellow { background: #fbbc04; }
+
+  /* === Forms === */
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 4px;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: border-color 0.2s;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+  }
+
+  select.form-control {
+    appearance: auto;
+  }
+
+  /* === Alerts === */
+  .alert {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+
+  .alert-info {
+    background: #e8f0fe;
+    color: #174ea6;
+    border: 1px solid #c6dafc;
+  }
+
+  .alert-success {
+    background: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+  }
+
+  .alert-error {
+    background: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #f5c6c2;
+  }
+
+  .alert-warning {
+    background: #fef7e0;
+    color: #b06000;
+    border: 1px solid #fde293;
+  }
+
+  /* === Progress Bar === */
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e8eaed;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: #1a73e8;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* === Section Headers === */
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 20px 0 10px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  /* === Loading Spinner === */
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e8eaed;
+    border-top-color: #1a73e8;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    color: #666;
+    font-size: 13px;
+  }
+
+  /* === Config Groups === */
+  .config-group {
+    margin-bottom: 24px;
+  }
+
+  .config-group-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a73e8;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e8f0fe;
+  }
+
+  /* === Naming Preview === */
+  .naming-preview {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 10px 0;
+    font-family: monospace;
+    font-size: 13px;
+  }
+
+  .naming-preview .preset-item {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .naming-preview .preset-item:last-child {
+    border-bottom: none;
+  }
+
+  .naming-preview .preset-selected {
+    background: #e8f0fe;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  /* === Responsive === */
+  @media (max-width: 600px) {
+    .app-container { padding: 8px; }
+    .card-grid { grid-template-columns: repeat(2, 1fr); }
+    .tab-btn { padding: 8px 12px; font-size: 12px; }
+    .btn-group { flex-direction: column; }
+    .btn { width: 100%; text-align: center; }
+  }
+
+  /* === Log Filter === */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-bar select {
+    padding: 6px 10px;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  /* === Pagination === */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .pagination button {
+    padding: 6px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .pagination .page-info {
+    font-size: 12px;
+    color: #666;
+  }
+</style>

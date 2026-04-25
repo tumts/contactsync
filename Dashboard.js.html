@@ -1,0 +1,631 @@
+<script>
+/* =============================================
+   Dashboard.js — ContactSync Dashboard Logic
+   CONSTRAINT: No template literals with HTML.
+   Uses string concatenation with + operator.
+   ============================================= */
+
+/* === Globals === */
+var currentTab = 'overview';
+var contactsData = [];
+var contactsPage = 1;
+var contactsPerPage = 20;
+var logsData = [];
+
+/* === Initialization === */
+document.addEventListener('DOMContentLoaded', function() {
+  switchTab('overview');
+  loadOverview();
+});
+
+/* === HTML Escape === */
+function esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* === Tab Navigation === */
+function switchTab(tabId) {
+  currentTab = tabId;
+  var tabs = document.querySelectorAll('.tab-btn');
+  for (var i = 0; i < tabs.length; i++) {
+    if (tabs[i].getAttribute('data-tab') === tabId) {
+      tabs[i].classList.add('active');
+    } else {
+      tabs[i].classList.remove('active');
+    }
+  }
+  var contents = document.querySelectorAll('.tab-content');
+  for (var j = 0; j < contents.length; j++) {
+    if (contents[j].id === 'tab-' + tabId) {
+      contents[j].classList.add('active');
+    } else {
+      contents[j].classList.remove('active');
+    }
+  }
+
+  if (tabId === 'overview') loadOverview();
+  else if (tabId === 'contacts') loadContacts();
+  else if (tabId === 'sync') loadSyncTab();
+  else if (tabId === 'wacheck') loadWaTab();
+  else if (tabId === 'logs') loadLogs();
+  else if (tabId === 'config') loadConfigTab();
+}
+
+/* === Notifications === */
+function showAlert(containerId, type, message) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '<div class="alert alert-' + type + '">' + esc(message) + '</div>';
+}
+
+function showLoading(containerId, message) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '<span class="spinner"></span><span class="loading-text">' + esc(message || 'Loading...') + '</span>';
+}
+
+function clearElement(id) {
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = '';
+}
+
+/* === Parse server response === */
+function parseResult(result) {
+  if (typeof result === 'string') {
+    try { return JSON.parse(result); } catch(e) { return { raw: result }; }
+  }
+  return result;
+}
+
+/* ============================================
+   TAB 1: OVERVIEW
+   ============================================ */
+function loadOverview() {
+  showLoading('overview-cards', 'Loading overview...');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      renderOverviewCards(data);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('overview-alert', 'error', 'Failed to load overview: ' + err.message);
+    })
+    .getOverviewData();
+}
+
+function renderOverviewCards(data) {
+  var el = document.getElementById('overview-cards');
+  if (!el) return;
+
+  var total = (data && data.totalContacts) || 0;
+  var synced = (data && data.synced) || 0;
+  var pending = (data && data.pending) || 0;
+  var errors = (data && data.errors) || 0;
+  var lastSync = (data && data.lastSync) || 'Never';
+  var students = (data && data.totalStudents) || 0;
+
+  var html = '<div class="card-grid">';
+  html += buildCard(students, 'Total Siswa');
+  html += buildCard(total, 'Total Contacts');
+  html += buildCard(synced, 'Synced');
+  html += buildCard(pending, 'Pending');
+  html += buildCard(errors, 'Errors');
+  html += '</div>';
+  html += '<p style="font-size:12px;color:#888;">Last sync: ' + esc(lastSync) + '</p>';
+
+  el.innerHTML = html;
+}
+
+function buildCard(value, label) {
+  return '<div class="card">' +
+    '<div class="card-value">' + esc(String(value)) + '</div>' +
+    '<div class="card-label">' + esc(label) + '</div>' +
+  '</div>';
+}
+
+function runAction(actionName, alertId) {
+  showLoading(alertId, 'Running ' + actionName + '...');
+  disableButtons(true);
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      var msg = data.message || (actionName + ' completed successfully');
+      showAlert(alertId, 'success', msg);
+      disableButtons(false);
+      if (currentTab === 'overview') loadOverview();
+    })
+    .withFailureHandler(function(err) {
+      showAlert(alertId, 'error', actionName + ' failed: ' + err.message);
+      disableButtons(false);
+    })[actionName]();
+}
+
+function disableButtons(disabled) {
+  var btns = document.querySelectorAll('.btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].disabled = disabled;
+  }
+}
+
+/* ============================================
+   TAB 2: CONTACTS TABLE
+   ============================================ */
+function loadContacts() {
+  showLoading('contacts-table-wrap', 'Loading contacts...');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      contactsData = parseResult(result);
+      if (!Array.isArray(contactsData)) contactsData = [];
+      contactsPage = 1;
+      renderContactsTable();
+    })
+    .withFailureHandler(function(err) {
+      showAlert('contacts-alert', 'error', 'Failed to load contacts: ' + err.message);
+    })
+    .getContactsList();
+}
+
+function renderContactsTable() {
+  var el = document.getElementById('contacts-table-wrap');
+  if (!el) return;
+
+  if (contactsData.length === 0) {
+    el.innerHTML = '<div class="alert alert-info">No contacts found. Run "Scan DataSiswa" first.</div>';
+    return;
+  }
+
+  var totalPages = Math.ceil(contactsData.length / contactsPerPage);
+  var start = (contactsPage - 1) * contactsPerPage;
+  var end = Math.min(start + contactsPerPage, contactsData.length);
+  var pageData = contactsData.slice(start, end);
+
+  var html = '<div class="table-wrap"><table>';
+  html += '<thead><tr>';
+  html += '<th>Name</th><th>Class</th><th>Phone</th><th>Email</th><th>WA Status</th><th>Sync Status</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var i = 0; i < pageData.length; i++) {
+    var c = pageData[i];
+    html += '<tr>';
+    html += '<td>' + esc(c.fullName) + '</td>';
+    html += '<td>' + esc(c.classLabel) + '</td>';
+    html += '<td>' + esc(c.phonePrimary) + '</td>';
+    html += '<td>' + esc(c.emailPrimary) + '</td>';
+    html += '<td>' + buildWaDot(c.waPhoneStatus) + '</td>';
+    html += '<td>' + buildSyncBadge(c.syncStatus) + '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  html += '<div class="pagination">';
+  html += '<button onclick="prevContactsPage()" ' + (contactsPage <= 1 ? 'disabled' : '') + '>Prev</button>';
+  html += '<span class="page-info">Page ' + contactsPage + ' of ' + totalPages + ' (' + contactsData.length + ' total)</span>';
+  html += '<button onclick="nextContactsPage()" ' + (contactsPage >= totalPages ? 'disabled' : '') + '>Next</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function buildWaDot(status) {
+  var dotClass = 'dot-gray';
+  var label = status || 'unchecked';
+  if (status === 'active') dotClass = 'dot-green';
+  else if (status === 'inactive') dotClass = 'dot-red';
+  else if (status === 'error') dotClass = 'dot-yellow';
+  return '<span class="status-dot ' + dotClass + '"></span>' + esc(label);
+}
+
+function buildSyncBadge(status) {
+  var badgeClass = 'badge-gray';
+  var label = status || 'pending';
+  if (status === 'synced') badgeClass = 'badge-green';
+  else if (status === 'error') badgeClass = 'badge-red';
+  else if (status === 'pending') badgeClass = 'badge-gray';
+  return '<span class="badge ' + badgeClass + '">' + esc(label) + '</span>';
+}
+
+function prevContactsPage() {
+  if (contactsPage > 1) { contactsPage--; renderContactsTable(); }
+}
+
+function nextContactsPage() {
+  var totalPages = Math.ceil(contactsData.length / contactsPerPage);
+  if (contactsPage < totalPages) { contactsPage++; renderContactsTable(); }
+}
+
+/* ============================================
+   TAB 3: SYNC
+   ============================================ */
+function loadSyncTab() {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      renderNamingPreview(data);
+    })
+    .withFailureHandler(function() {})
+    .previewNaming(1);
+}
+
+function renderNamingPreview(data) {
+  var el = document.getElementById('naming-preview-area');
+  if (!el || !data || !data.presets) return;
+
+  var html = '<div class="naming-preview">';
+  for (var i = 0; i < data.presets.length; i++) {
+    var p = data.presets[i];
+    var cls = p.selected ? 'preset-item preset-selected' : 'preset-item';
+    html += '<div class="' + cls + '">';
+    html += '<strong>Preset ' + esc(String(p.id)) + ':</strong> ' + esc(p.example);
+    html += '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function updateNamingPreview() {
+  var presetSelect = document.getElementById('sync-preset');
+  var presetId = presetSelect ? presetSelect.value : '1';
+  google.script.run
+    .withSuccessHandler(function(result) {
+      renderNamingPreview(parseResult(result));
+    })
+    .withFailureHandler(function() {})
+    .previewNaming(Number(presetId));
+}
+
+function runPreviewSync() {
+  showLoading('sync-alert', 'Running preview sync (dry-run)...');
+  disableButtons(true);
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      var msg = 'Preview: ' + (data.create || 0) + ' create, ' +
+        (data.update || 0) + ' update, ' +
+        (data.skip || 0) + ' skip, ' +
+        (data.error || 0) + ' error';
+      if (data.complete === false) {
+        msg += ' (incomplete — run again to continue)';
+      }
+      showAlert('sync-alert', 'info', msg);
+      disableButtons(false);
+      renderSyncProgress(data);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('sync-alert', 'error', 'Preview failed: ' + err.message);
+      disableButtons(false);
+    })
+    .previewSync();
+}
+
+function runExecuteSync() {
+  showLoading('sync-alert', 'Executing sync to Google Contacts...');
+  disableButtons(true);
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
+        (data.errors || 0) + ' errors, ' +
+        (data.skipped || 0) + ' skipped';
+      if (data.complete === false) {
+        msg += ' (incomplete — run again to continue)';
+      }
+      showAlert('sync-alert', data.errors > 0 ? 'warning' : 'success', msg);
+      disableButtons(false);
+      renderSyncProgress(data);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('sync-alert', 'error', 'Sync failed: ' + err.message);
+      disableButtons(false);
+    })
+    .runSync();
+}
+
+function renderSyncProgress(data) {
+  var el = document.getElementById('sync-progress');
+  if (!el) return;
+
+  var total = data.total || 1;
+  var processed = data.processed || data.synced || data.create || 0;
+  if (data.complete) processed = total;
+  var pct = Math.round((processed / total) * 100);
+
+  var html = '<div class="progress-bar">' +
+    '<div class="progress-fill" style="width:' + pct + '%"></div>' +
+  '</div>' +
+  '<p style="font-size:12px;color:#666;text-align:center;">' + pct + '% (' + processed + '/' + total + ')</p>';
+
+  el.innerHTML = html;
+}
+
+function saveSyncConfig() {
+  var classLabel = document.getElementById('sync-class-label');
+  var yearLabel = document.getElementById('sync-year-label');
+  var presetSelect = document.getElementById('sync-preset');
+  var parentMode = document.querySelector('input[name="parent-mode"]:checked');
+
+  var updates = {};
+  if (classLabel) updates.DEFAULT_CLASS_LABEL = classLabel.value;
+  if (yearLabel) updates.DEFAULT_YEAR_LABEL = yearLabel.value;
+  if (presetSelect) updates.NAMING_PRESET = presetSelect.value;
+  if (parentMode) updates.PARENT_CONTACT_MODE = parentMode.value;
+
+  var keys = Object.keys(updates);
+  for (var i = 0; i < keys.length; i++) {
+    google.script.run.setConfigValue(keys[i], updates[keys[i]]);
+  }
+  showAlert('sync-alert', 'success', 'Sync settings saved');
+}
+
+/* ============================================
+   TAB 4: WA CHECK
+   ============================================ */
+function loadWaTab() {
+  clearElement('wa-alert');
+  clearElement('wa-progress');
+}
+
+function testWaConnection() {
+  showLoading('wa-alert', 'Testing connection...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      if (data.success) {
+        showAlert('wa-alert', 'success', 'Connected: ' + (data.message || 'OK'));
+        var statusEl = document.getElementById('wa-status-indicator');
+        if (statusEl) statusEl.innerHTML = '<span class="status-dot dot-green"></span>Connected';
+      } else {
+        showAlert('wa-alert', 'error', 'Disconnected: ' + (data.message || 'Failed'));
+        var statusEl2 = document.getElementById('wa-status-indicator');
+        if (statusEl2) statusEl2.innerHTML = '<span class="status-dot dot-red"></span>Disconnected';
+      }
+    })
+    .withFailureHandler(function(err) {
+      showAlert('wa-alert', 'error', 'Connection test failed: ' + err.message);
+    })
+    .testWaConnection();
+}
+
+function runCheckAllNumbers() {
+  showLoading('wa-alert', 'Checking all numbers (this may take a while)...');
+  disableButtons(true);
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      if (data.success === false) {
+        showAlert('wa-alert', 'error', data.message || 'Check failed');
+        disableButtons(false);
+        return;
+      }
+
+      var s = data.summary || {};
+      var msg = 'Check complete: ' +
+        (s.active || 0) + ' active, ' +
+        (s.inactive || 0) + ' inactive, ' +
+        (s.invalid || 0) + ' invalid, ' +
+        (s.error || 0) + ' error';
+      if (data.complete === false) {
+        msg += ' (incomplete — run again to continue)';
+      }
+      showAlert('wa-alert', 'success', msg);
+      disableButtons(false);
+      renderWaSummary(s);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('wa-alert', 'error', 'WA check failed: ' + err.message);
+      disableButtons(false);
+    })
+    .checkAllContactNumbers();
+}
+
+function renderWaSummary(summary) {
+  var el = document.getElementById('wa-summary');
+  if (!el) return;
+
+  var html = '<div class="card-grid">';
+  html += buildWaCard(summary.active || 0, 'Active', 'badge-green');
+  html += buildWaCard(summary.inactive || 0, 'Inactive', 'badge-red');
+  html += buildWaCard(summary.invalid || 0, 'Invalid', 'badge-yellow');
+  html += buildWaCard(summary.error || 0, 'Error', 'badge-red');
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function buildWaCard(value, label, badgeClass) {
+  return '<div class="card">' +
+    '<div class="card-value">' + esc(String(value)) + '</div>' +
+    '<div class="card-label"><span class="badge ' + badgeClass + '">' + esc(label) + '</span></div>' +
+  '</div>';
+}
+
+/* ============================================
+   TAB 5: LOGS
+   ============================================ */
+function loadLogs() {
+  showLoading('logs-table-wrap', 'Loading logs...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      logsData = result;
+      if (!Array.isArray(logsData)) logsData = [];
+      renderLogsTable(logsData);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('logs-alert', 'error', 'Failed to load logs: ' + err.message);
+    })
+    .getRecentLogs(100);
+}
+
+function renderLogsTable(logs) {
+  var el = document.getElementById('logs-table-wrap');
+  if (!el) return;
+
+  if (!logs || logs.length === 0) {
+    el.innerHTML = '<div class="alert alert-info">No logs found.</div>';
+    return;
+  }
+
+  var html = '<div class="table-wrap"><table>';
+  html += '<thead><tr>';
+  html += '<th>Timestamp</th><th>Row ID</th><th>Action</th><th>Result</th><th>Message</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var i = 0; i < logs.length; i++) {
+    var log = logs[i];
+    var resultBadge = 'badge-gray';
+    if (log.result === 'success') resultBadge = 'badge-green';
+    else if (log.result === 'error') resultBadge = 'badge-red';
+    else if (log.result === 'warning') resultBadge = 'badge-yellow';
+
+    html += '<tr>';
+    html += '<td>' + esc(log.timestamp) + '</td>';
+    html += '<td>' + esc(log.rowId) + '</td>';
+    html += '<td>' + esc(log.action) + '</td>';
+    html += '<td><span class="badge ' + resultBadge + '">' + esc(log.result) + '</span></td>';
+    html += '<td>' + esc(log.message) + '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function filterLogs() {
+  var actionFilter = document.getElementById('log-filter-action');
+  var resultFilter = document.getElementById('log-filter-result');
+  var actionVal = actionFilter ? actionFilter.value : '';
+  var resultVal = resultFilter ? resultFilter.value : '';
+
+  var filtered = [];
+  for (var i = 0; i < logsData.length; i++) {
+    var log = logsData[i];
+    if (actionVal && String(log.action) !== actionVal) continue;
+    if (resultVal && String(log.result) !== resultVal) continue;
+    filtered.push(log);
+  }
+
+  renderLogsTable(filtered);
+}
+
+function clearAllLogs() {
+  if (!confirm('Clear all logs?')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showAlert('logs-alert', 'success', 'Logs cleared');
+      logsData = [];
+      renderLogsTable([]);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('logs-alert', 'error', 'Failed to clear logs: ' + err.message);
+    })
+    .clearLogs();
+}
+
+/* ============================================
+   TAB 6: CONFIG
+   ============================================ */
+function loadConfigTab() {
+  showLoading('config-form-area', 'Loading config...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var config = parseResult(result);
+      renderConfigForm(config);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('config-alert', 'error', 'Failed to load config: ' + err.message);
+    })
+    .loadConfig();
+}
+
+function renderConfigForm(config) {
+  var el = document.getElementById('config-form-area');
+  if (!el) return;
+
+  var groups = {
+    'Source': ['SOURCE_SPREADSHEET_ID', 'SOURCE_SHEET'],
+    'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
+    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL'],
+    'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
+    'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS'],
+    'Advanced': ['DEBUG_MODE']
+  };
+
+  var html = '';
+  var groupNames = Object.keys(groups);
+  for (var g = 0; g < groupNames.length; g++) {
+    var groupName = groupNames[g];
+    var keys = groups[groupName];
+    html += '<div class="config-group">';
+    html += '<div class="config-group-title">' + esc(groupName) + '</div>';
+
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      var val = config[key] !== undefined ? String(config[key]) : '';
+      html += '<div class="form-group">';
+      html += '<label for="cfg-' + esc(key) + '">' + esc(key) + '</label>';
+
+      if (key === 'PARENT_CONTACT_MODE') {
+        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+        html += '<option value="consolidated"' + (val === 'consolidated' ? ' selected' : '') + '>Consolidated</option>';
+        html += '<option value="separate"' + (val === 'separate' ? ' selected' : '') + '>Separate</option>';
+        html += '</select>';
+      } else if (key === 'WA_API_ENABLED' || key === 'DRY_RUN_DEFAULT' || key === 'DEBUG_MODE') {
+        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+        html += '<option value="true"' + (val === 'true' ? ' selected' : '') + '>true</option>';
+        html += '<option value="false"' + (val === 'false' ? ' selected' : '') + '>false</option>';
+        html += '</select>';
+      } else if (key === 'WA_API_BASIC_AUTH_PASS') {
+        html += '<input type="password" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
+      } else {
+        html += '<input type="text" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function saveAllConfig() {
+  showLoading('config-alert', 'Saving config...');
+
+  var inputs = document.querySelectorAll('[data-config-key]');
+  var configObj = {};
+  for (var i = 0; i < inputs.length; i++) {
+    var key = inputs[i].getAttribute('data-config-key');
+    configObj[key] = inputs[i].value;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      showAlert('config-alert', 'success', 'Config saved (' + (data.saved || 0) + ' keys)');
+    })
+    .withFailureHandler(function(err) {
+      showAlert('config-alert', 'error', 'Failed to save: ' + err.message);
+    })
+    .saveConfig(configObj);
+}
+
+function resetConfigDefaults() {
+  if (!confirm('Reset all config to defaults?')) return;
+  loadConfigTab();
+  showAlert('config-alert', 'info', 'Form reset to current values. Edit and save to apply defaults.');
+}
+</script>
