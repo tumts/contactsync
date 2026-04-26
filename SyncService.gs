@@ -382,8 +382,8 @@ function runSync() {
       continue;
     }
 
-    // Skip already-synced contacts to prevent duplicates after clearErrorsAndReset
-    if (String(c.syncStatus || '').trim() === 'synced') {
+    // Skip already-synced contacts with 'create' action to prevent duplicates after clearErrorsAndReset
+    if (action === 'create' && String(c.syncStatus || '').trim() === 'synced') {
       skippedCount++;
       continue;
     }
