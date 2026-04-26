@@ -103,7 +103,7 @@ clasp push
 ### 8. Konfigurasi Source Spreadsheet
 
 Di sheet **Config** atau via Dashboard tab Config, pastikan:
-- `SOURCE_SPREADSHEET_ID` = `1NPGuKFP35_7oT5c6bhkvqo2AWix-Ym3o0RtJBoUHvM4` (ID spreadsheet SiswaHub)
+- `SOURCE_SPREADSHEET_ID` = ID spreadsheet SiswaHub (set di sheet Config, jangan hardcode di kode)
 - `SOURCE_SHEET` = `DataSiswa`
 
 **PENTING**: Akun Google yang menjalankan ContactSync harus memiliki akses baca ke spreadsheet SiswaHub.
@@ -131,11 +131,48 @@ Di sheet Config atau Dashboard tab Config, atur:
 - `WA_API_BASE_URL`: URL server WA API (default: `http://localhost:3000`)
 - `WA_API_BASIC_AUTH_USER` / `WA_API_BASIC_AUTH_PASS`: Opsional Basic Auth
 - `WA_API_TIMEOUT_MS`: Timeout per request (default: 10000)
-- `WA_API_BATCH_DELAY_MS`: Delay antar request batch (default: 1500)
+- `WA_API_BATCH_DELAY_MS`: Delay antar request batch (default: 5000)
 
 Endpoint yang digunakan:
 - `GET /app/devices` — Cek koneksi & status device
 - `POST /user/check` — Cek apakah nomor terdaftar di WhatsApp
+
+## Keamanan
+
+### Kredensial
+- Jangan commit ID spreadsheet, password, atau API credentials ke repository
+- Semua nilai sensitif disimpan di sheet Config (bukan di kode)
+- Pastikan sheet Config tidak di-share ke publik
+
+### Mitigasi Anti-Blokir WhatsApp
+
+> **PERINGATAN:** go-whatsapp-web-multidevice bukan layanan resmi WhatsApp.
+> Penggunaan berlebihan dapat menyebabkan nomor WhatsApp diblokir permanen.
+
+Rekomendasi penggunaan:
+- **Gunakan nomor khusus** — Jangan gunakan nomor pribadi/utama
+- **Batasi pengecekan** — Maksimal 100 nomor per hari (default)
+- **Jeda antar cek** — Minimum 5 detik + jitter acak (default)
+- **Jeda antar batch** — 1 menit setiap 10 nomor (default)
+- **Hindari cek ulang** — Nomor yang sudah dicek tidak akan dicek ulang selama 7 hari
+- **Jalankan di luar jam sibuk** — Gunakan trigger malam hari jika memungkinkan
+- **Monitor log** — Periksa SyncLog untuk error berturut-turut (tanda rate limiting)
+
+Parameter yang bisa diatur di Config:
+| Key | Default | Keterangan |
+|---|---|---|
+| `WA_API_BATCH_DELAY_MS` | 5000 | Jeda minimum antar cek (ms) |
+| `WA_API_JITTER_MS` | 3000 | Randomisasi tambahan (ms) |
+| `WA_API_BATCH_SIZE` | 10 | Jumlah cek per batch |
+| `WA_API_BATCH_PAUSE_MS` | 60000 | Jeda antar batch (ms) |
+| `WA_API_DAILY_LIMIT` | 100 | Maksimal cek per hari |
+| `WA_API_RECHECK_DAYS` | 7 | Jangan cek ulang dalam X hari |
+
+Jika nomor terkena blokir:
+1. Hentikan semua pengecekan segera
+2. Tunggu 24-48 jam sebelum mencoba lagi
+3. Naikkan nilai delay dan kurangi daily limit
+4. Pertimbangkan menggunakan nomor baru
 
 ## People API Quota
 
@@ -169,3 +206,7 @@ contactsync/
 ├── Dashboard.js.html      # JavaScript (vanilla, string concatenation)
 └── README.md              # Dokumentasi
 ```
+
+## Proyek Terkait
+
+- [SiswaHub Pro 2026](https://github.com/tumts/siswahub) — Sistem Informasi Manajemen Data Siswa (sumber data)

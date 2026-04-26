@@ -372,6 +372,29 @@ function saveSyncConfig() {
 function loadWaTab() {
   clearElement('wa-alert');
   clearElement('wa-progress');
+
+  // Show warning banner
+  var progressEl = document.getElementById('wa-progress');
+  if (progressEl) {
+    progressEl.innerHTML =
+      '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;margin-bottom:12px;color:#856404;font-size:13px;">' +
+      '<strong>PERINGATAN:</strong> Gunakan nomor WA khusus (bukan nomor pribadi) untuk pengecekan. Risiko blokir oleh WhatsApp.' +
+      '</div>' +
+      '<div id="wa-quota-info" style="margin-bottom:12px;font-size:13px;color:#555;"></div>';
+  }
+
+  // Load quota info
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      var dailyLimit = parseInt(data.WA_API_DAILY_LIMIT) || 100;
+      var el = document.getElementById('wa-quota-info');
+      if (el) {
+        el.setAttribute('data-daily-limit', dailyLimit);
+      }
+    })
+    .withFailureHandler(function() {})
+    .loadConfig();
 }
 
 function testWaConnection() {
@@ -417,6 +440,14 @@ function runCheckAllNumbers() {
         (s.error || 0) + ' error';
       if (data.complete === false) {
         msg += ' (incomplete — run again to continue)';
+      }
+      if (typeof data.skipped !== 'undefined') {
+        msg += '. Nomor di-skip (sudah dicek): ' + data.skipped;
+      }
+      if (typeof data.remainingToday !== 'undefined') {
+        var quotaEl = document.getElementById('wa-quota-info');
+        var dailyLimit = quotaEl ? (parseInt(quotaEl.getAttribute('data-daily-limit')) || 100) : 100;
+        msg += '. Sisa kuota hari ini: ' + data.remainingToday + '/' + dailyLimit;
       }
       showAlert('wa-alert', 'success', msg);
       disableButtons(false);
@@ -559,7 +590,7 @@ function renderConfigForm(config) {
     'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
     'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL'],
     'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
-    'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS'],
+    'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_DEVICE_JID', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS', 'WA_API_JITTER_MS', 'WA_API_BATCH_SIZE', 'WA_API_BATCH_PAUSE_MS', 'WA_API_DAILY_LIMIT', 'WA_API_RECHECK_DAYS'],
     'Advanced': ['DEBUG_MODE']
   };
 

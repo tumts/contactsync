@@ -3,8 +3,6 @@
  * API reference: https://github.com/aldinokemal/go-whatsapp-web-multidevice
  */
 
-var WA_BATCH_SIZE = 30;
-var WA_BATCH_PAUSE_MS = 2000;
 var WA_TIMEOUT_MS = 270000; // 4.5 minutes
 
 /**
@@ -144,13 +142,67 @@ function checkWhatsAppNumber(phone) {
 }
 
 /**
+ * Generate random delay with jitter for anti-detection.
+ * @return {number} Delay in milliseconds.
+ */
+function getRandomDelay() {
+  var config = loadConfig();
+  var baseDelay = parseInt(config.WA_API_BATCH_DELAY_MS) || 5000;
+  var jitter = parseInt(config.WA_API_JITTER_MS) || 3000;
+  return baseDelay + Math.floor(Math.random() * jitter);
+}
+
+/**
+ * Check how many WA checks have been done today.
+ * @return {number} Count of checks today.
+ */
+function getTodayCheckCount() {
+  var config = loadConfig();
+  var logSheet = config.SYNCLOG_SHEET || 'SyncLog';
+  var logs = readSheetAsObjects(logSheet);
+  var today = new Date().toISOString().split('T')[0];
+  var count = 0;
+  for (var i = 0; i < logs.length; i++) {
+    if (String(logs[i].action || '') === 'wa_check' &&
+        String(logs[i].timestamp || '').indexOf(today) === 0) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Check if a number was already checked within recheck period.
+ * @param {string} phone Normalized phone number.
+ * @return {boolean} True if recently checked.
+ */
+function wasRecentlyChecked(phone) {
+  var config = loadConfig();
+  var recheckDays = parseInt(config.WA_API_RECHECK_DAYS) || 7;
+  var logSheet = config.SYNCLOG_SHEET || 'SyncLog';
+  var logs = readSheetAsObjects(logSheet);
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - recheckDays);
+
+  for (var i = logs.length - 1; i >= 0; i--) {
+    if (String(logs[i].action || '') === 'wa_check' &&
+        String(logs[i].row_id || '') === phone) {
+      var logDate = new Date(logs[i].timestamp);
+      if (logDate >= cutoff) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Batch check an array of phone numbers.
  * @param {Array<Object>} phoneList Array of { rowId, phone }.
  * @return {string} JSON result.
  */
 function batchCheckNumbers(phoneList) {
   var config = loadConfig();
-  var batchDelay = Number(config.WA_API_BATCH_DELAY_MS || 1500);
+  var batchSize = parseInt(config.WA_API_BATCH_SIZE) || 10;
+  var batchPause = parseInt(config.WA_API_BATCH_PAUSE_MS) || 60000;
   var startTime = new Date().getTime();
   var props = PropertiesService.getScriptProperties();
   var startIndex = 0;
@@ -167,29 +219,37 @@ function batchCheckNumbers(phoneList) {
 
   var results = [];
   var summary = { active: 0, inactive: 0, invalid: 0, error: 0 };
+  var consecutiveErrors = 0;
 
   for (var i = startIndex; i < phoneList.length; i++) {
-    // Timeout guard
-    if (i > startIndex && (i - startIndex) % 10 === 0) {
-      var elapsed = new Date().getTime() - startTime;
-      if (elapsed > WA_TIMEOUT_MS) {
-        props.setProperty('batchCheck_progress', JSON.stringify({
-          lastIndex: i,
-          summary: summary
-        }));
-        return JSON.stringify({
-          complete: false,
-          checked: i,
-          total: phoneList.length,
-          results: results,
-          summary: summary
-        });
-      }
+    // GAS 4.5-minute timeout guard
+    var elapsed = new Date().getTime() - startTime;
+    if (elapsed > WA_TIMEOUT_MS) {
+      props.setProperty('batchCheck_progress', JSON.stringify({
+        lastIndex: i,
+        summary: summary
+      }));
+      return JSON.stringify({
+        complete: false,
+        checked: i,
+        total: phoneList.length,
+        results: results,
+        summary: summary
+      });
     }
 
-    // Batch pause
-    if (i > startIndex && (i - startIndex) % WA_BATCH_SIZE === 0) {
-      Utilities.sleep(WA_BATCH_PAUSE_MS);
+    // Batch pause every batchSize checks
+    if (i > startIndex && (i - startIndex) % batchSize === 0) {
+      Utilities.sleep(batchPause);
+    }
+
+    // Random delay between each check with exponential backoff on errors
+    var delay = getRandomDelay();
+    if (consecutiveErrors > 0) {
+      delay = delay * Math.pow(2, Math.min(consecutiveErrors, 5));
+    }
+    if (i > startIndex) {
+      Utilities.sleep(delay);
     }
 
     var item = phoneList[i];
@@ -202,15 +262,22 @@ function batchCheckNumbers(phoneList) {
       message: checkResult.message || ''
     });
 
-    if (checkResult.status === 'active') summary.active++;
-    else if (checkResult.status === 'inactive') summary.inactive++;
-    else if (checkResult.status === 'invalid') summary.invalid++;
-    else summary.error++;
-
-    // Delay between individual checks
-    if (i < phoneList.length - 1) {
-      Utilities.sleep(batchDelay);
+    if (checkResult.status === 'error') {
+      consecutiveErrors++;
+      summary.error++;
+      if (consecutiveErrors >= 5) {
+        logAction(item.phone, 'wa_check', 'abort', 'Too many consecutive errors');
+        break;
+      }
+    } else {
+      consecutiveErrors = 0;
+      if (checkResult.status === 'active') summary.active++;
+      else if (checkResult.status === 'inactive') summary.inactive++;
+      else if (checkResult.status === 'invalid') summary.invalid++;
+      else summary.error++;
     }
+
+    logAction(item.phone, 'wa_check', checkResult.status, checkResult.message || '');
   }
 
   props.deleteProperty('batchCheck_progress');
@@ -258,6 +325,7 @@ function resumeBatchCheck() {
  */
 function checkAllContactNumbers() {
   var config = loadConfig();
+  var dailyLimit = parseInt(config.WA_API_DAILY_LIMIT) || 100;
 
   if (config.WA_API_ENABLED !== 'true') {
     return JSON.stringify({
@@ -266,8 +334,17 @@ function checkAllContactNumbers() {
     });
   }
 
+  var todayCount = getTodayCheckCount();
+  if (todayCount >= dailyLimit) {
+    return JSON.stringify({
+      success: false,
+      message: 'Batas harian tercapai (' + dailyLimit + ' cek/hari). Coba lagi besok.'
+    });
+  }
+
+  var remaining = dailyLimit - todayCount;
   var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
-  var phoneList = [];
+  var allPhones = [];
   var seen = {};
 
   for (var i = 0; i < contacts.length; i++) {
@@ -280,13 +357,31 @@ function checkAllContactNumbers() {
       var num = String(phones[p].value || '').trim();
       if (num && !seen[num]) {
         seen[num] = true;
-        phoneList.push({ rowId: contacts[i].id, phone: num });
+        allPhones.push({ rowId: contacts[i].id, phone: num });
       }
     }
   }
 
+  // Filter out recently checked numbers
+  var phoneList = [];
+  var skipped = 0;
+  for (var j = 0; j < allPhones.length && phoneList.length < remaining; j++) {
+    var normalized = normalizePhoneNumber(allPhones[j].phone);
+    if (normalized && !wasRecentlyChecked(normalized)) {
+      phoneList.push(allPhones[j]);
+    } else if (normalized) {
+      skipped++;
+    }
+  }
+
   if (phoneList.length === 0) {
-    return JSON.stringify({ success: true, message: 'No phone numbers to check', summary: {} });
+    return JSON.stringify({
+      success: true,
+      message: 'No phone numbers to check (skipped ' + skipped + ' recently checked)',
+      summary: {},
+      skipped: skipped,
+      remainingToday: remaining
+    });
   }
 
   var result = JSON.parse(batchCheckNumbers(phoneList));
@@ -311,6 +406,7 @@ function checkAllContactNumbers() {
     }
   }
 
+  var checked = result.checked || 0;
   logAction('system', 'waCheckAll', result.complete ? 'success' : 'partial',
     'WA check: ' + (result.summary.active || 0) + ' active, ' + (result.summary.inactive || 0) + ' inactive',
     JSON.stringify(result.summary));
@@ -318,8 +414,10 @@ function checkAllContactNumbers() {
   return JSON.stringify({
     success: true,
     complete: result.complete,
-    total: phoneList.length,
-    checked: result.checked,
+    total: allPhones.length,
+    checked: checked,
+    skipped: skipped,
+    remainingToday: remaining - checked,
     summary: result.summary
   });
 }
