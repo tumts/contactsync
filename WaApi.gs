@@ -92,6 +92,151 @@ function testWaConnection() {
 }
 
 /**
+ * Test WA number check with 1-2 numbers from contacts.
+ * @param {number} count Number of contacts to test (default 1).
+ * @return {string} JSON result with detailed check results.
+ */
+function testWaCheck(count) {
+  count = count || 1;
+  var config = loadConfig();
+
+  if (config.WA_API_ENABLED !== 'true') {
+    return JSON.stringify({ success: false, message: 'WA API is disabled. Enable it in Config first.' });
+  }
+
+  var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
+  var testNumbers = [];
+
+  for (var i = 0; i < contacts.length && testNumbers.length < count; i++) {
+    var phone = String(contacts[i].phonePrimary || '').trim();
+    if (phone) {
+      testNumbers.push({
+        id: contacts[i].id,
+        name: contacts[i].fullName || '(no name)',
+        phone: phone
+      });
+    }
+  }
+
+  if (testNumbers.length === 0) {
+    return JSON.stringify({ success: false, message: 'No contacts with phone numbers found.' });
+  }
+
+  var results = [];
+  for (var t = 0; t < testNumbers.length; t++) {
+    var item = testNumbers[t];
+    var checkResult = checkWhatsAppNumber(item.phone);
+
+    // Also try to get user info if available
+    var userInfo = null;
+    try {
+      userInfo = getWaUserInfo(item.phone);
+    } catch (e) {
+      // user info is optional
+    }
+
+    results.push({
+      name: item.name,
+      phone: item.phone,
+      status: checkResult.status,
+      jid: checkResult.jid || '',
+      message: checkResult.message || '',
+      pushName: (userInfo && userInfo.pushName) || '',
+      verifiedName: (userInfo && userInfo.verifiedName) || ''
+    });
+
+    // Update contacts sheet
+    if (checkResult.status === 'active' || checkResult.status === 'inactive') {
+      var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+      var now = formatTimestamp(new Date());
+      updateRowByKey(contactsSheet, 'id', item.id, {
+        waPhoneStatus: checkResult.status,
+        waPhoneCheckedAt: now
+      });
+    }
+
+    logAction(item.phone, 'wa_check_test', checkResult.status,
+      'Test WA check: ' + item.name + ' (' + item.phone + ') = ' + checkResult.status,
+      JSON.stringify(checkResult));
+
+    if (t < testNumbers.length - 1) {
+      Utilities.sleep(2000);
+    }
+  }
+
+  return JSON.stringify({
+    success: true,
+    tested: results.length,
+    results: results
+  });
+}
+
+/**
+ * Get WhatsApp user info (pushName, verified name, etc.)
+ * Uses GET /user/info endpoint.
+ * @param {string} phone Normalized phone number.
+ * @return {Object|null} User info or null.
+ */
+function getWaUserInfo(phone) {
+  var config = loadConfig();
+  if (config.WA_API_ENABLED !== 'true') return null;
+
+  var normalized = normalizePhoneNumber(phone);
+  if (!normalized) return null;
+
+  var baseUrl = config.WA_API_BASE_URL || 'http://localhost:3000';
+
+  try {
+    var options = buildFetchOptions('get', null);
+    var response = UrlFetchApp.fetch(baseUrl + '/user/info?phone=' + encodeURIComponent(normalized), options);
+    var code = response.getResponseCode();
+    var body = JSON.parse(response.getContentText());
+
+    if (code === 200 && body.results) {
+      return {
+        pushName: body.results.push_name || body.results.pushName || '',
+        verifiedName: body.results.verified_name || body.results.verifiedName || '',
+        status: body.results.status || '',
+        pictureId: body.results.picture_id || ''
+      };
+    }
+  } catch (e) {
+    // User info is optional, don't fail
+  }
+  return null;
+}
+
+/**
+ * Get WhatsApp user avatar URL.
+ * Uses GET /user/avatar endpoint.
+ * @param {string} phone Normalized phone number.
+ * @return {string|null} Avatar URL or null.
+ */
+function getWaUserAvatar(phone) {
+  var config = loadConfig();
+  if (config.WA_API_ENABLED !== 'true') return null;
+
+  var normalized = normalizePhoneNumber(phone);
+  if (!normalized) return null;
+
+  var baseUrl = config.WA_API_BASE_URL || 'http://localhost:3000';
+
+  try {
+    var options = buildFetchOptions('get', null);
+    var response = UrlFetchApp.fetch(baseUrl + '/user/avatar?phone=' + encodeURIComponent(normalized), options);
+    var code = response.getResponseCode();
+    var body = JSON.parse(response.getContentText());
+
+    if (code === 200 && body.results) {
+      return body.results.url || body.results.avatar || null;
+    }
+  } catch (e) {
+    // Avatar is optional
+  }
+  return null;
+}
+
+/**
  * Check if a single phone number is registered on WhatsApp.
  * @param {string} phone Raw phone number.
  * @return {Object} Status result.
