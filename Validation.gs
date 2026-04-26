@@ -213,6 +213,10 @@ function findDuplicates() {
 
   // Check if student phone matches any parent phone
   for (var i = 0; i < contacts.length; i++) {
+    // Skip parent contacts — they are not students
+    var contactId = String(contacts[i].id || '');
+    if (contactId.indexOf('-ayah') !== -1 || contactId.indexOf('-ibu') !== -1) continue;
+
     var studentPhone = String(contacts[i].phonePrimary || '').trim();
     if (studentPhone && parentPhoneMap[studentPhone]) {
       for (var p = 0; p < parentPhoneMap[studentPhone].length; p++) {
