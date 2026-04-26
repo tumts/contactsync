@@ -232,7 +232,7 @@ function batchCheckNumbers(phoneList) {
       }));
       return JSON.stringify({
         complete: false,
-        checked: i,
+        checked: results.length,
         total: phoneList.length,
         results: results,
         summary: summary
