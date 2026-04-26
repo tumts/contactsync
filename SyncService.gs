@@ -7,6 +7,7 @@ var SYNC_BATCH_PAUSE_MS = 3000;
 var SYNC_API_DELAY_MS = 1000;
 var SYNC_TIMEOUT_MS = 270000; // 4.5 minutes (guard before 5-min limit)
 var SYNC_CHECKPOINT_INTERVAL = 10;
+var SYNC_MAX_CONSECUTIVE_ERRORS = 5;
 
 /**
  * Scan DataSiswa sheet and import to Contacts sheet.
@@ -152,6 +153,7 @@ function scanDataSiswa() {
  * @return {string} JSON result summary.
  */
 function previewSync() {
+  clearGroupCache();
   var config = loadConfig();
   var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
 
@@ -296,6 +298,7 @@ function resumePreview() {
  * @return {string} JSON result summary.
  */
 function runSync() {
+  clearGroupCache();
   var config = loadConfig();
   var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
 
@@ -322,6 +325,8 @@ function runSync() {
   var errorCount = 0;
   var skippedCount = 0;
   var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+  var consecutiveErrors = 0;
+  var maxConsecutiveErrors = parseInt(config.SYNC_MAX_CONSECUTIVE_ERRORS) || SYNC_MAX_CONSECUTIVE_ERRORS;
 
   for (var i = startIndex; i < contacts.length; i++) {
     // Timeout guard
@@ -389,6 +394,7 @@ function runSync() {
           lastError: ''
         });
         syncedCount++;
+        consecutiveErrors = 0;
         logAction(c.id, 'create', 'success', 'Created contact: ' + c.fullName, result.resourceName);
       } else {
         updateRowByKey(contactsSheet, 'id', c.id, {
@@ -396,6 +402,7 @@ function runSync() {
           lastError: result.error || 'Unknown error'
         });
         errorCount++;
+        consecutiveErrors++;
         logAction(c.id, 'create', 'error', 'Failed to create: ' + c.fullName, result.error);
       }
     } else if (action === 'update') {
@@ -409,6 +416,7 @@ function runSync() {
           lastError: ''
         });
         syncedCount++;
+        consecutiveErrors = 0;
         logAction(c.id, 'update', 'success', 'Updated contact: ' + c.fullName,
           result.retried ? 'Retried with fresh etag' : '');
       } else {
@@ -417,12 +425,41 @@ function runSync() {
           lastError: result.error || 'Unknown error'
         });
         errorCount++;
+        consecutiveErrors++;
         logAction(c.id, 'update', 'error', 'Failed to update: ' + c.fullName, result.error);
       }
     }
 
-    // Rate limiting
-    Utilities.sleep(SYNC_API_DELAY_MS);
+    // Stop on consecutive errors
+    if (consecutiveErrors >= maxConsecutiveErrors) {
+      props.setProperty('runSync_progress', JSON.stringify({
+        lastIndex: i + 1,
+        synced: syncedCount,
+        errors: errorCount,
+        skipped: skippedCount
+      }));
+      SpreadsheetApp.flush();
+      logAction('system', 'sync', 'error',
+        'Sync stopped: ' + consecutiveErrors + ' consecutive errors. Fix issues and run again.',
+        JSON.stringify({ synced: syncedCount, errors: errorCount, lastError: result.error }));
+      return JSON.stringify({
+        complete: false,
+        stoppedOnError: true,
+        synced: syncedCount,
+        errors: errorCount,
+        skipped: skippedCount,
+        total: contacts.length,
+        processed: i + 1,
+        message: 'Stopped after ' + consecutiveErrors + ' consecutive errors'
+      });
+    }
+
+    // Rate limiting with exponential backoff on errors
+    if (consecutiveErrors > 0) {
+      Utilities.sleep(SYNC_API_DELAY_MS * Math.min(consecutiveErrors, 5));
+    } else {
+      Utilities.sleep(SYNC_API_DELAY_MS);
+    }
   }
 
   // Clear progress
@@ -448,6 +485,87 @@ function runSync() {
  */
 function resumeSync() {
   return runSync();
+}
+
+/**
+ * Test sync with a small number of contacts to verify everything works.
+ * @param {number} count Number of contacts to test (default 2).
+ * @return {string} JSON result summary.
+ */
+function testSync(count) {
+  count = count || 2;
+  var config = loadConfig();
+  var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
+
+  if (!contacts || contacts.length === 0) {
+    return JSON.stringify({ success: false, message: 'No contacts found.' });
+  }
+
+  // Find first N contacts with syncPreviewAction = 'create' or 'update'
+  var testContacts = [];
+  for (var i = 0; i < contacts.length && testContacts.length < count; i++) {
+    var action = String(contacts[i].syncPreviewAction || '').trim();
+    if (action === 'create' || action === 'update') {
+      testContacts.push(contacts[i]);
+    }
+  }
+
+  if (testContacts.length === 0) {
+    return JSON.stringify({ success: false, message: 'No contacts with create/update action found. Run Preview Sync first.' });
+  }
+
+  clearGroupCache();
+  var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+  var syncedCount = 0;
+  var errorCount = 0;
+  var results = [];
+
+  for (var t = 0; t < testContacts.length; t++) {
+    var c = testContacts[t];
+    var action = String(c.syncPreviewAction || '').trim();
+    var result;
+
+    if (action === 'create') {
+      result = createGoogleContact(c);
+    } else {
+      result = updateGoogleContact(c.googleResourceName, c.googleEtag, c);
+    }
+
+    if (result.success) {
+      updateRowByKey(contactsSheet, 'id', c.id, {
+        googleResourceName: result.resourceName,
+        googleEtag: result.etag,
+        syncStatus: 'synced',
+        lastSyncedAt: formatTimestamp(new Date()),
+        lastError: ''
+      });
+      syncedCount++;
+      results.push({ name: c.fullName, action: action, status: 'success' });
+      logAction(c.id, action, 'success', 'Test sync: ' + c.fullName, result.resourceName);
+    } else {
+      updateRowByKey(contactsSheet, 'id', c.id, {
+        syncStatus: 'error',
+        lastError: result.error || 'Unknown error'
+      });
+      errorCount++;
+      results.push({ name: c.fullName, action: action, status: 'error', error: result.error });
+      logAction(c.id, action, 'error', 'Test sync failed: ' + c.fullName, result.error);
+    }
+
+    Utilities.sleep(SYNC_API_DELAY_MS);
+  }
+
+  logAction('system', 'sync', errorCount > 0 ? 'error' : 'success',
+    'Test sync: ' + syncedCount + ' synced, ' + errorCount + ' errors (tested ' + testContacts.length + ')',
+    JSON.stringify(results));
+
+  return JSON.stringify({
+    success: errorCount === 0,
+    tested: testContacts.length,
+    synced: syncedCount,
+    errors: errorCount,
+    results: results
+  });
 }
 
 /**
