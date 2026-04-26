@@ -194,26 +194,127 @@ function findDuplicates() {
     }
   }
 
+  // === Cross-check: Student phone vs Parent phone ===
+  var parentPhoneMap = {};
+  var parentEmailMap = {};
+
+  for (var i = 0; i < contacts.length; i++) {
+    var pp = String(contacts[i].parentPhone || '').trim();
+    var pe = String(contacts[i].parentEmail || '').trim().toLowerCase();
+    if (pp) {
+      if (!parentPhoneMap[pp]) parentPhoneMap[pp] = [];
+      parentPhoneMap[pp].push(i);
+    }
+    if (pe) {
+      if (!parentEmailMap[pe]) parentEmailMap[pe] = [];
+      parentEmailMap[pe].push(i);
+    }
+  }
+
+  // Check if student phone matches any parent phone
+  for (var i = 0; i < contacts.length; i++) {
+    var studentPhone = String(contacts[i].phonePrimary || '').trim();
+    if (studentPhone && parentPhoneMap[studentPhone]) {
+      for (var p = 0; p < parentPhoneMap[studentPhone].length; p++) {
+        var parentIdx = parentPhoneMap[studentPhone][p];
+        if (parentIdx !== i) {
+          dupId++;
+          duplicates.push({
+            id: dupId,
+            name1: contacts[i].fullName + ' (siswa)',
+            name2: contacts[parentIdx].parentName + ' (' + (contacts[parentIdx].parentRole || 'orangtua') + ' dari ' + contacts[parentIdx].fullName + ')',
+            phone1: studentPhone,
+            phone2: contacts[parentIdx].parentPhone,
+            email1: contacts[i].emailPrimary || '',
+            email2: contacts[parentIdx].parentEmail || '',
+            score: 95,
+            status: 'pending',
+            resolvedAt: ''
+          });
+        }
+      }
+    }
+
+    // Check if student email matches any parent email
+    var studentEmail = String(contacts[i].emailPrimary || '').trim().toLowerCase();
+    if (studentEmail && parentEmailMap[studentEmail]) {
+      for (var p = 0; p < parentEmailMap[studentEmail].length; p++) {
+        var parentIdx2 = parentEmailMap[studentEmail][p];
+        if (parentIdx2 !== i) {
+          dupId++;
+          duplicates.push({
+            id: dupId,
+            name1: contacts[i].fullName + ' (siswa)',
+            name2: contacts[parentIdx2].parentName + ' (' + (contacts[parentIdx2].parentRole || 'orangtua') + ' dari ' + contacts[parentIdx2].fullName + ')',
+            phone1: contacts[i].phonePrimary || '',
+            phone2: contacts[parentIdx2].parentPhone || '',
+            email1: studentEmail,
+            email2: contacts[parentIdx2].parentEmail || '',
+            score: 93,
+            status: 'pending',
+            resolvedAt: ''
+          });
+        }
+      }
+    }
+  }
+
+  // Check parent phone vs parent phone (siblings — same parent)
+  var seenParentPairs = {};
+  var parentPhoneKeys = Object.keys(parentPhoneMap);
+  for (var pk = 0; pk < parentPhoneKeys.length; pk++) {
+    var indices = parentPhoneMap[parentPhoneKeys[pk]];
+    if (indices.length > 1) {
+      for (var a = 0; a < indices.length; a++) {
+        for (var b = a + 1; b < indices.length; b++) {
+          var pairKey = indices[a] + '-' + indices[b];
+          if (!seenParentPairs[pairKey]) {
+            seenParentPairs[pairKey] = true;
+            dupId++;
+            duplicates.push({
+              id: dupId,
+              name1: contacts[indices[a]].fullName + ' (orangtua: ' + contacts[indices[a]].parentName + ')',
+              name2: contacts[indices[b]].fullName + ' (orangtua: ' + contacts[indices[b]].parentName + ')',
+              phone1: contacts[indices[a]].parentPhone,
+              phone2: contacts[indices[b]].parentPhone,
+              email1: contacts[indices[a]].parentEmail || '',
+              email2: contacts[indices[b]].parentEmail || '',
+              score: 80,
+              status: 'pending',
+              resolvedAt: ''
+            });
+          }
+        }
+      }
+    }
+  }
+
   if (duplicates.length > 0) {
     writeObjectsToSheet(config.DUPLICATES_SHEET || 'Duplicates', duplicates, DUPLICATES_HEADERS);
   }
 
-  var byEmail = 0, byPhone = 0, byName = 0;
+  var byEmail = 0, byPhone = 0, byName = 0, byParentPhone = 0, byParentEmail = 0, bySibling = 0;
   for (var d = 0; d < duplicates.length; d++) {
-    if (duplicates[d].score === 90) byEmail++;
+    if (duplicates[d].score === 95) byParentPhone++;
+    else if (duplicates[d].score === 93) byParentEmail++;
+    else if (duplicates[d].score === 90) byEmail++;
     else if (duplicates[d].score === 85) byPhone++;
+    else if (duplicates[d].score === 80) bySibling++;
     else byName++;
   }
 
   logAction('system', 'findDuplicates', 'success',
     'Found ' + duplicates.length + ' duplicates',
-    JSON.stringify({ byEmail: byEmail, byPhone: byPhone, byName: byName }));
+    JSON.stringify({ byEmail: byEmail, byPhone: byPhone, byName: byName, byParentPhone: byParentPhone, byParentEmail: byParentEmail, bySibling: bySibling }));
 
   return JSON.stringify({
     total: duplicates.length,
     byEmail: byEmail,
     byPhone: byPhone,
-    byName: byName
+    byName: byName,
+    byParentPhone: byParentPhone,
+    byParentEmail: byParentEmail,
+    bySibling: bySibling
   });
 }
 
