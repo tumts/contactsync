@@ -41,6 +41,39 @@
       <button class="btn btn-primary" onclick="sidebarAction('previewSync')">Preview Sync</button>
       <button class="btn btn-success" onclick="sidebarAction('runSync')">Run Sync</button>
     </div>
+
+    <div class="section-title" style="font-size:14px;margin-top:16px;">Settings</div>
+    <div class="sidebar-actions">
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Year Label</label>
+        <input type="text" id="sb-year-label" class="form-control" style="font-size:12px;padding:6px 8px;" />
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Naming Preset</label>
+        <select id="sb-naming-preset" class="form-control" style="font-size:12px;padding:6px 8px;">
+          <option value="1">First Last</option>
+          <option value="2">Last, First</option>
+          <option value="3">Full Name</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Default Status</label>
+        <select id="sb-student-status" class="form-control" style="font-size:12px;padding:6px 8px;">
+          <option value="aktif">Aktif</option>
+          <option value="berhenti">Berhenti</option>
+          <option value="lulus">Lulus</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Parent Mode</label>
+        <select id="sb-parent-mode" class="form-control" style="font-size:12px;padding:6px 8px;">
+          <option value="consolidated">Consolidated</option>
+          <option value="separate">Separate</option>
+        </select>
+      </div>
+      <button class="btn btn-success" style="width:100%;font-size:12px;" onclick="saveSidebarSettings()">Save Settings</button>
+      <button class="btn btn-secondary" style="width:100%;font-size:12px;margin-top:4px;" onclick="openFullConfig()">All Settings...</button>
+    </div>
   </div>
 
   <script>
@@ -105,8 +138,60 @@
         })[actionName]();
     }
 
+    function loadSidebarSettings() {
+      google.script.run
+        .withSuccessHandler(function(config) {
+          if (typeof config === 'string') {
+            try { config = JSON.parse(config); } catch(e) { return; }
+          }
+          var yearEl = document.getElementById('sb-year-label');
+          var presetEl = document.getElementById('sb-naming-preset');
+          var statusEl = document.getElementById('sb-student-status');
+          var parentEl = document.getElementById('sb-parent-mode');
+          if (yearEl) yearEl.value = config.DEFAULT_YEAR_LABEL || '2026';
+          if (presetEl) presetEl.value = config.NAMING_PRESET || '1';
+          if (statusEl) statusEl.value = config.DEFAULT_STUDENT_STATUS || 'aktif';
+          if (parentEl) parentEl.value = config.PARENT_CONTACT_MODE || 'consolidated';
+        })
+        .withFailureHandler(function() {})
+        .loadConfig();
+    }
+
+    function saveSidebarSettings() {
+      var alertEl = document.getElementById('sidebar-alert');
+      if (alertEl) alertEl.innerHTML = '<div class="alert alert-info" style="font-size:12px;">Saving...</div>';
+
+      var updates = {};
+      var yearEl = document.getElementById('sb-year-label');
+      var presetEl = document.getElementById('sb-naming-preset');
+      var statusEl = document.getElementById('sb-student-status');
+      var parentEl = document.getElementById('sb-parent-mode');
+      if (yearEl) updates.DEFAULT_YEAR_LABEL = yearEl.value;
+      if (presetEl) updates.NAMING_PRESET = presetEl.value;
+      if (statusEl) updates.DEFAULT_STUDENT_STATUS = statusEl.value;
+      if (parentEl) updates.PARENT_CONTACT_MODE = parentEl.value;
+
+      var keys = Object.keys(updates);
+      var saved = 0;
+      for (var i = 0; i < keys.length; i++) {
+        google.script.run
+          .withSuccessHandler(function() {
+            saved++;
+            if (saved >= keys.length && alertEl) {
+              alertEl.innerHTML = '<div class="alert alert-success" style="font-size:12px;">Settings saved</div>';
+            }
+          })
+          .setConfigValue(keys[i], updates[keys[i]]);
+      }
+    }
+
+    function openFullConfig() {
+      google.script.run.openConfigDialog();
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       loadMiniOverview();
+      loadSidebarSettings();
     });
   </script>
 </body>

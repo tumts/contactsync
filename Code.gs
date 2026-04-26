@@ -66,6 +66,18 @@ function openSidebarShortcut() {
 }
 
 /**
+ * Open the full config dialog from sidebar.
+ */
+function openConfigDialog() {
+  var html = HtmlService.createTemplateFromFile('ConfigDialog')
+    .evaluate()
+    .setTitle('ContactSync Config')
+    .setWidth(700)
+    .setHeight(500);
+  SpreadsheetApp.getUi().showModalDialog(html, 'ContactSync Config');
+}
+
+/**
  * Get overview data for the dashboard.
  * @return {Object} Overview summary.
  */
@@ -357,4 +369,46 @@ function clearErrorsAndReset() {
     message: resetCount + ' error contacts reset to pending. Error logs cleared.',
     resetCount: resetCount
   });
+}
+
+/**
+ * Update student status for a single contact.
+ * @param {string} contactId Contact ID.
+ * @param {string} newStatus New status (aktif/berhenti/lulus).
+ * @return {string} JSON result.
+ */
+function updateContactStatus(contactId, newStatus) {
+  var validStatuses = ['aktif', 'berhenti', 'lulus'];
+  if (validStatuses.indexOf(newStatus) === -1) {
+    return JSON.stringify({ success: false, message: 'Invalid status: ' + newStatus });
+  }
+
+  var config = loadConfig();
+  var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+  var contacts = readSheetAsObjects(contactsSheet);
+
+  var contact = null;
+  for (var i = 0; i < contacts.length; i++) {
+    if (String(contacts[i].id) === String(contactId)) {
+      contact = contacts[i];
+      break;
+    }
+  }
+
+  if (!contact) {
+    return JSON.stringify({ success: false, message: 'Contact not found: ' + contactId });
+  }
+
+  var newLabels = buildLabels(contact.classLabel, contact.yearLabel, newStatus);
+
+  var updated = updateRowByKey(contactsSheet, 'id', contactId, {
+    studentStatus: newStatus,
+    labels: newLabels,
+    syncStatus: 'pending'
+  });
+
+  logAction(contactId, 'statusChange', 'success',
+    'Status changed to ' + newStatus + ' for ' + (contact.fullName || contactId), '');
+
+  return JSON.stringify({ success: updated, contactId: contactId, newStatus: newStatus });
 }
