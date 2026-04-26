@@ -19,10 +19,8 @@
     <div class="tab-nav">
       <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
       <button class="tab-btn" data-tab="contacts" onclick="switchTab('contacts')">Contacts</button>
-      <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">Sync</button>
       <button class="tab-btn" data-tab="wacheck" onclick="switchTab('wacheck')">WA Check</button>
       <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Logs</button>
-      <button class="tab-btn" data-tab="config" onclick="switchTab('config')">Config</button>
       <button class="tab-btn" data-tab="quality" onclick="switchTab('quality')">Data Quality</button>
     </div>
 
@@ -30,14 +28,25 @@
     <div id="tab-overview" class="tab-content active">
       <div id="overview-alert"></div>
       <div id="overview-cards"></div>
+
       <div class="section-title">Quick Actions</div>
       <div class="btn-group">
-        <button class="btn btn-secondary" onclick="runAction('initializeWorkspace','overview-alert')">Initialize Workspace</button>
+        <button class="btn btn-secondary" onclick="runAction('initializeWorkspace','overview-alert')">Initialize</button>
         <button class="btn btn-primary" onclick="runAction('scanDataSiswa','overview-alert')">Scan DataSiswa</button>
         <button class="btn btn-primary" onclick="runAction('validateContacts','overview-alert')">Validate</button>
-        <button class="btn btn-primary" onclick="runAction('previewSync','overview-alert')">Preview Sync</button>
-        <button class="btn btn-success" onclick="runAction('runSync','overview-alert')">Run Sync</button>
       </div>
+
+      <div class="section-title">Sync</div>
+      <div class="btn-group">
+        <button class="btn btn-warning" onclick="runTestSync()">Test Sync (2)</button>
+        <button class="btn btn-primary" onclick="runPreviewSync()">Preview Sync</button>
+        <button class="btn btn-success" onclick="runExecuteSync()">Execute Sync</button>
+        <button id="btn-cancel-sync" class="btn btn-danger" onclick="cancelRunningSync()" style="display:none;">Cancel Sync</button>
+        <button class="btn btn-danger" onclick="clearErrorsAndResetUI()">Clear Errors &amp; Reset</button>
+      </div>
+      <div id="sync-progress"></div>
+
+      <div id="overview-breakdown"></div>
     </div>
 
     <!-- TAB 2: Contacts -->
@@ -51,65 +60,7 @@
       <div id="contacts-table-wrap"></div>
     </div>
 
-    <!-- TAB 3: Sync -->
-    <div id="tab-sync" class="tab-content">
-      <div id="sync-alert"></div>
 
-      <div class="section-title">Sync Settings</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label for="sync-class-label">Class Label</label>
-          <input type="text" id="sync-class-label" class="form-control" placeholder="e.g. 7A" />
-        </div>
-        <div class="form-group">
-          <label for="sync-year-label">Year Label</label>
-          <input type="text" id="sync-year-label" class="form-control" value="2026" />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="sync-preset">Naming Preset</label>
-        <select id="sync-preset" class="form-control" onchange="updateNamingPreview()">
-          <option value="1">Preset 1: First Last</option>
-          <option value="2">Preset 2: Last, First</option>
-          <option value="3">Preset 3: Full Name</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="sync-student-status">Default Student Status</label>
-        <select id="sync-student-status" class="form-control">
-          <option value="aktif">Aktif</option>
-          <option value="berhenti">Berhenti</option>
-          <option value="lulus">Lulus</option>
-        </select>
-      </div>
-
-      <div id="naming-preview-area"></div>
-
-      <div class="form-group">
-        <label>Parent Contact Mode</label>
-        <div>
-          <label style="font-weight:normal;margin-right:16px;">
-            <input type="radio" name="parent-mode" value="consolidated" checked /> Consolidated (parent info in student contact)
-          </label>
-          <label style="font-weight:normal;">
-            <input type="radio" name="parent-mode" value="separate" /> Separate (create separate contacts for parents)
-          </label>
-        </div>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn btn-secondary" onclick="saveSyncConfig()">Save Settings</button>
-        <button class="btn btn-warning" onclick="runTestSync()">Test Sync (2)</button>
-        <button class="btn btn-primary" onclick="runPreviewSync()">Preview Sync</button>
-        <button class="btn btn-success" onclick="runExecuteSync()">Execute Sync</button>
-        <button id="btn-cancel-sync" class="btn btn-danger" onclick="cancelRunningSync()" style="display:none;">Cancel Sync</button>
-        <button class="btn btn-danger" onclick="clearErrorsAndResetUI()">Clear Errors &amp; Reset</button>
-      </div>
-
-      <div id="sync-progress"></div>
-    </div>
 
     <!-- TAB 4: WA Check -->
     <div id="tab-wacheck" class="tab-content">
@@ -166,18 +117,7 @@
       <div id="logs-table-wrap"></div>
     </div>
 
-    <!-- TAB 6: Config -->
-    <div id="tab-config" class="tab-content">
-      <div id="config-alert"></div>
 
-      <div class="section-title">Configuration</div>
-      <div id="config-form-area"></div>
-
-      <div class="btn-group">
-        <button class="btn btn-success" onclick="saveAllConfig()">Save Config</button>
-        <button class="btn btn-secondary" onclick="resetConfigDefaults()">Reset to Defaults</button>
-      </div>
-    </div>
 
     <!-- TAB 7: Data Quality -->
     <div id="tab-quality" class="tab-content">
