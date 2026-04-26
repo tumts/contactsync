@@ -353,6 +353,17 @@ function filterContacts() {
       }
     }
 
+    if (activeFilters._grade) {
+      var cl = String(c.classLabel || '').trim();
+      var contactGrade = cl.replace(/[A-Za-z]+$/, '').trim();
+      if (contactGrade !== activeFilters._grade) matchesFilter = false;
+    }
+    if (activeFilters._rombel) {
+      var cl2 = String(c.classLabel || '').trim();
+      var contactRombel = cl2.replace(/^[0-9]+/, '').trim();
+      if (contactRombel !== activeFilters._rombel) matchesFilter = false;
+    }
+
     if (matchesKeyword && matchesFilter) {
       filteredContactsData.push(c);
     }
@@ -366,7 +377,8 @@ function renderFilterPills() {
   var el = document.getElementById('contacts-filter-pills');
   if (!el) return;
 
-  var classValues = {};
+  var gradeValues = {};
+  var rombelValues = {};
   var syncValues = {};
   var waValues = {};
   var statusValues = {};
@@ -377,39 +389,54 @@ function renderFilterPills() {
     var ss = String(c.syncStatus || '').trim();
     var ws = String(c.waPhoneStatus || '').trim();
     var st = String(c.studentStatus || '').trim();
-    if (cl) classValues[cl] = true;
+
+    // Parse classLabel into grade and rombel
+    if (cl) {
+      var grade = cl.replace(/[A-Za-z]+$/, '').trim();
+      var rombel = cl.replace(/^[0-9]+/, '').trim();
+      if (grade) gradeValues[grade] = true;
+      if (rombel) rombelValues[rombel] = true;
+    }
     if (ss) syncValues[ss] = true;
     if (ws) waValues[ws] = true;
     if (st) statusValues[st] = true;
   }
 
   var html = '<strong style="font-size:11px;color:#888;margin-right:4px;">Kelas:</strong>';
-  var classes = Object.keys(classValues).sort();
-  for (var c = 0; c < classes.length; c++) {
-    var active = activeFilters.classLabel === classes[c] ? ' active' : '';
-    html += '<span class="filter-pill' + active + '" onclick="toggleFilterPill(\'classLabel\',\'' + esc(classes[c]) + '\')">' + esc(classes[c]) + '</span>';
+  var grades = Object.keys(gradeValues).sort();
+  for (var g = 0; g < grades.length; g++) {
+    var active = activeFilters._grade === grades[g] ? ' active' : '';
+    html += '<span class="filter-pill' + active + '" onclick="toggleGradeFilter(\'' + esc(grades[g]) + '\')">' + esc(grades[g]) + '</span>';
   }
 
+  html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">Rombel:</strong>';
+  var rombels = Object.keys(rombelValues).sort();
+  for (var r = 0; r < rombels.length; r++) {
+    var active2 = activeFilters._rombel === rombels[r] ? ' active' : '';
+    html += '<span class="filter-pill' + active2 + '" onclick="toggleRombelFilter(\'' + esc(rombels[r]) + '\')">' + esc(rombels[r]) + '</span>';
+  }
+
+  // Keep existing Sync, WA, Status pills (same as before)
   html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">Sync:</strong>';
   var syncs = Object.keys(syncValues).sort();
   for (var s = 0; s < syncs.length; s++) {
-    var active2 = activeFilters.syncStatus === syncs[s] ? ' active' : '';
-    html += '<span class="filter-pill' + active2 + '" onclick="toggleFilterPill(\'syncStatus\',\'' + esc(syncs[s]) + '\')">' + esc(syncs[s]) + '</span>';
+    var active3 = activeFilters.syncStatus === syncs[s] ? ' active' : '';
+    html += '<span class="filter-pill' + active3 + '" onclick="toggleFilterPill(\'syncStatus\',\'' + esc(syncs[s]) + '\')">' + esc(syncs[s]) + '</span>';
   }
 
   html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">WA:</strong>';
   var was = Object.keys(waValues).sort();
   for (var w = 0; w < was.length; w++) {
-    var active3 = activeFilters.waPhoneStatus === was[w] ? ' active' : '';
-    html += '<span class="filter-pill' + active3 + '" onclick="toggleFilterPill(\'waPhoneStatus\',\'' + esc(was[w]) + '\')">' + esc(was[w]) + '</span>';
+    var active4 = activeFilters.waPhoneStatus === was[w] ? ' active' : '';
+    html += '<span class="filter-pill' + active4 + '" onclick="toggleFilterPill(\'waPhoneStatus\',\'' + esc(was[w]) + '\')">' + esc(was[w]) + '</span>';
   }
 
   var statuses = Object.keys(statusValues).sort();
   if (statuses.length > 0) {
     html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">Status:</strong>';
     for (var t = 0; t < statuses.length; t++) {
-      var active4 = activeFilters.studentStatus === statuses[t] ? ' active' : '';
-      html += '<span class="filter-pill' + active4 + '" onclick="toggleFilterPill(\'studentStatus\',\'' + esc(statuses[t]) + '\')">' + esc(statuses[t]) + '</span>';
+      var active5 = activeFilters.studentStatus === statuses[t] ? ' active' : '';
+      html += '<span class="filter-pill' + active5 + '" onclick="toggleFilterPill(\'studentStatus\',\'' + esc(statuses[t]) + '\')">' + esc(statuses[t]) + '</span>';
     }
   }
 
@@ -421,6 +448,26 @@ function toggleFilterPill(type, value) {
     delete activeFilters[type];
   } else {
     activeFilters[type] = value;
+  }
+  renderFilterPills();
+  filterContacts();
+}
+
+function toggleGradeFilter(grade) {
+  if (activeFilters._grade === grade) {
+    delete activeFilters._grade;
+  } else {
+    activeFilters._grade = grade;
+  }
+  renderFilterPills();
+  filterContacts();
+}
+
+function toggleRombelFilter(rombel) {
+  if (activeFilters._rombel === rombel) {
+    delete activeFilters._rombel;
+  } else {
+    activeFilters._rombel = rombel;
   }
   renderFilterPills();
   filterContacts();
