@@ -31,6 +31,32 @@ function scanDataSiswa() {
   var contacts = [];
   var parentCount = 0;
 
+  // Preserve existing WA check data
+  var existingContacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
+  var existingWaMap = {};
+  var existingSyncMap = {};
+  for (var e = 0; e < existingContacts.length; e++) {
+    var ec = existingContacts[e];
+    var phone = String(ec.phonePrimary || '').trim();
+    if (phone) {
+      if (ec.waPhoneStatus) {
+        existingWaMap[phone] = {
+          waPhoneStatus: String(ec.waPhoneStatus || ''),
+          waPhoneCheckedAt: String(ec.waPhoneCheckedAt || '')
+        };
+      }
+      // Also preserve sync data for already-synced contacts
+      if (ec.googleResourceName) {
+        existingSyncMap[phone] = {
+          googleResourceName: String(ec.googleResourceName || ''),
+          googleEtag: String(ec.googleEtag || ''),
+          syncStatus: String(ec.syncStatus || ''),
+          lastSyncedAt: String(ec.lastSyncedAt || '')
+        };
+      }
+    }
+  }
+
   for (var i = 0; i < sourceData.length; i++) {
     var row = sourceData[i];
     var mapped = mapSourceColumns(row);
@@ -46,6 +72,20 @@ function scanDataSiswa() {
     mapped.dedupeKey = generateDedupeKey(mapped.fullName, mapped.phonePrimary, mapped.emailPrimary);
 
     contacts.push(mapped);
+
+    // Restore existing WA check data
+    var mappedPhone = String(mapped.phonePrimary || '').trim();
+    if (mappedPhone && existingWaMap[mappedPhone]) {
+      mapped.waPhoneStatus = existingWaMap[mappedPhone].waPhoneStatus;
+      mapped.waPhoneCheckedAt = existingWaMap[mappedPhone].waPhoneCheckedAt;
+    }
+    // Restore existing sync data
+    if (mappedPhone && existingSyncMap[mappedPhone]) {
+      mapped.googleResourceName = existingSyncMap[mappedPhone].googleResourceName;
+      mapped.googleEtag = existingSyncMap[mappedPhone].googleEtag;
+      mapped.syncStatus = existingSyncMap[mappedPhone].syncStatus;
+      mapped.lastSyncedAt = existingSyncMap[mappedPhone].lastSyncedAt;
+    }
 
     // Separate parent contacts if mode is 'separate'
     if (parentMode === 'separate') {
@@ -89,6 +129,17 @@ function scanDataSiswa() {
           studentStatus: ''
         };
         contacts.push(fatherContact);
+        var fatherPhone = String(fatherContact.phonePrimary || '').trim();
+        if (fatherPhone && existingWaMap[fatherPhone]) {
+          fatherContact.waPhoneStatus = existingWaMap[fatherPhone].waPhoneStatus;
+          fatherContact.waPhoneCheckedAt = existingWaMap[fatherPhone].waPhoneCheckedAt;
+        }
+        if (fatherPhone && existingSyncMap[fatherPhone]) {
+          fatherContact.googleResourceName = existingSyncMap[fatherPhone].googleResourceName;
+          fatherContact.googleEtag = existingSyncMap[fatherPhone].googleEtag;
+          fatherContact.syncStatus = existingSyncMap[fatherPhone].syncStatus;
+          fatherContact.lastSyncedAt = existingSyncMap[fatherPhone].lastSyncedAt;
+        }
         fatherContact.labels = buildParentLabels(mapped.classLabel, yearLabel, 'Ayah');
         parentCount++;
       }
@@ -133,6 +184,17 @@ function scanDataSiswa() {
           studentStatus: ''
         };
         contacts.push(motherContact);
+        var motherPhone = String(motherContact.phonePrimary || '').trim();
+        if (motherPhone && existingWaMap[motherPhone]) {
+          motherContact.waPhoneStatus = existingWaMap[motherPhone].waPhoneStatus;
+          motherContact.waPhoneCheckedAt = existingWaMap[motherPhone].waPhoneCheckedAt;
+        }
+        if (motherPhone && existingSyncMap[motherPhone]) {
+          motherContact.googleResourceName = existingSyncMap[motherPhone].googleResourceName;
+          motherContact.googleEtag = existingSyncMap[motherPhone].googleEtag;
+          motherContact.syncStatus = existingSyncMap[motherPhone].syncStatus;
+          motherContact.lastSyncedAt = existingSyncMap[motherPhone].lastSyncedAt;
+        }
         motherContact.labels = buildParentLabels(mapped.classLabel, yearLabel, 'Ibu');
         parentCount++;
       }
