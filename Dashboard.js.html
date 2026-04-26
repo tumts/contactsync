@@ -854,6 +854,7 @@ function loadWaTab() {
 
       var gradeSelect = document.getElementById('wa-grade-filter');
       if (gradeSelect) {
+        while (gradeSelect.options.length > 1) gradeSelect.remove(1);
         var gradeKeys = Object.keys(grades).sort();
         for (var g = 0; g < gradeKeys.length; g++) {
           var opt = document.createElement('option');
@@ -865,6 +866,7 @@ function loadWaTab() {
 
       var rombelSelect = document.getElementById('wa-rombel-filter');
       if (rombelSelect) {
+        while (rombelSelect.options.length > 1) rombelSelect.remove(1);
         var rombelKeys = Object.keys(rombels).sort();
         for (var r = 0; r < rombelKeys.length; r++) {
           var opt2 = document.createElement('option');
