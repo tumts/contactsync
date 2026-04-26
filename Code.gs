@@ -309,3 +309,52 @@ function migrateToNewSchema() {
     migrated: migrated
   });
 }
+
+/**
+ * Clear error logs and reset error contacts to pending for retry.
+ * @return {string} JSON result.
+ */
+function clearErrorsAndReset() {
+  var config = loadConfig();
+  var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+  var contacts = readSheetAsObjects(contactsSheet);
+
+  var resetCount = 0;
+  for (var i = 0; i < contacts.length; i++) {
+    if (String(contacts[i].syncStatus || '').trim() === 'error') {
+      updateRowByKey(contactsSheet, 'id', contacts[i].id, {
+        syncStatus: 'pending',
+        lastError: ''
+      });
+      resetCount++;
+    }
+  }
+
+  // Clear sync progress
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('runSync_progress');
+  props.deleteProperty('previewSync_progress');
+
+  // Clear error logs from SyncLog
+  var logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config.SYNCLOG_SHEET || 'SyncLog');
+  if (logSheet) {
+    var logData = logSheet.getDataRange().getValues();
+    // Delete rows with result='error' from bottom to top to preserve indices
+    for (var r = logData.length - 1; r >= 1; r--) {
+      var resultCol = logData[0].indexOf('result');
+      if (resultCol !== -1 && String(logData[r][resultCol]).trim() === 'error') {
+        logSheet.deleteRow(r + 1);
+      }
+    }
+    SpreadsheetApp.flush();
+  }
+
+  logAction('system', 'sync', 'success',
+    'Cleared errors: ' + resetCount + ' contacts reset to pending, error logs removed', '');
+
+  return JSON.stringify({
+    success: true,
+    message: resetCount + ' error contacts reset to pending. Error logs cleared.',
+    resetCount: resetCount
+  });
+}

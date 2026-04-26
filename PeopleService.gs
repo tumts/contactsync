@@ -2,6 +2,24 @@
  * PeopleService.gs — Google Contacts integration via People API Advanced Service.
  */
 
+// Cache for contact groups — populated once per execution
+var _contactGroupCache = null;
+
+function getCachedContactGroups() {
+  if (_contactGroupCache) return _contactGroupCache;
+  try {
+    var groups = People.ContactGroups.list({ pageSize: 100 });
+    _contactGroupCache = (groups && groups.contactGroups) ? groups.contactGroups : [];
+  } catch (e) {
+    _contactGroupCache = [];
+  }
+  return _contactGroupCache;
+}
+
+function clearGroupCache() {
+  _contactGroupCache = null;
+}
+
 /**
  * Search for an existing contact in Google Contacts.
  * @param {string} name Contact name.
@@ -416,16 +434,16 @@ function updateGoogleContact(resourceName, etag, contactData) {
  */
 function getOrCreateContactGroup(groupName) {
   try {
-    var groups = People.ContactGroups.list({ pageSize: 100 });
-    if (groups && groups.contactGroups) {
-      for (var i = 0; i < groups.contactGroups.length; i++) {
-        if (groups.contactGroups[i].name === groupName) {
-          return { resourceName: groups.contactGroups[i].resourceName };
-        }
+    var groups = getCachedContactGroups();
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i].name === groupName) {
+        return { resourceName: groups[i].resourceName };
       }
     }
 
+    // Not found — create new group and add to cache
     var newGroup = People.ContactGroups.create({ contactGroup: { name: groupName } });
+    _contactGroupCache.push(newGroup);
     return { resourceName: newGroup.resourceName };
   } catch (e) {
     return { resourceName: '', error: e.toString() };

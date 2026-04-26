@@ -167,15 +167,36 @@ function runAction(actionName, alertId) {
   showLoading(alertId, 'Running ' + actionName + '...');
   disableButtons(true);
 
+  // Show cancel button for sync-related actions
+  var isSyncAction = (actionName === 'runSync' || actionName === 'previewSync');
+  var cancelBtn = document.getElementById('btn-cancel-sync');
+  if (isSyncAction) {
+    if (cancelBtn) { cancelBtn.style.display = 'inline-block'; cancelBtn.disabled = false; }
+    startSyncPolling();
+  }
+
   google.script.run
     .withSuccessHandler(function(result) {
+      if (isSyncAction) {
+        stopSyncPolling();
+        if (cancelBtn) cancelBtn.style.display = 'none';
+      }
       var data = parseResult(result);
       var msg = data.message || (actionName + ' completed successfully');
-      showAlert(alertId, 'success', msg);
+      if (data.stoppedOnError) {
+        msg = 'Sync stopped: ' + (data.errors || 0) + ' consecutive errors. ' + (data.synced || 0) + ' synced.';
+        showAlert(alertId, 'error', msg);
+      } else {
+        showAlert(alertId, 'success', msg);
+      }
       disableButtons(false);
       if (currentTab === 'overview') loadOverview();
     })
     .withFailureHandler(function(err) {
+      if (isSyncAction) {
+        stopSyncPolling();
+        if (cancelBtn) cancelBtn.style.display = 'none';
+      }
       showAlert(alertId, 'error', actionName + ' failed: ' + err.message);
       disableButtons(false);
     })[actionName]();
@@ -563,6 +584,9 @@ function runExecuteSync() {
         var msg = 'Sync cancelled: ' + (data.synced || 0) + ' synced, ' +
           (data.errors || 0) + ' errors (stopped at ' + (data.processed || 0) + '/' + (data.total || 0) + ')';
         showAlert('sync-alert', 'warning', msg);
+      } else if (data.stoppedOnError) {
+        var msg = 'Sync stopped: ' + (data.errors || 0) + ' errors, ' + (data.synced || 0) + ' synced. Fix issues then run again.';
+        showAlert('sync-alert', 'error', msg);
       } else {
         var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
           (data.errors || 0) + ' errors, ' +
@@ -595,6 +619,51 @@ function cancelRunningSync() {
       showAlert('sync-alert', 'error', 'Failed to cancel: ' + err.message);
     })
     .cancelSync();
+}
+
+function runTestSync() {
+  var countStr = prompt('Berapa kontak yang ingin di-test? (default: 2)', '2');
+  if (countStr === null) return;
+  var count = parseInt(countStr) || 2;
+
+  showLoading('sync-alert', 'Testing sync with ' + count + ' contacts...');
+  disableButtons(true);
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      var msg = 'Test sync: ' + (data.synced || 0) + ' synced, ' + (data.errors || 0) + ' errors';
+      if (data.results) {
+        for (var r = 0; r < data.results.length; r++) {
+          var res = data.results[r];
+          msg += '\n' + res.name + ': ' + res.status;
+          if (res.error) msg += ' (' + res.error.substring(0, 100) + ')';
+        }
+      }
+      showAlert('sync-alert', data.errors > 0 ? 'error' : 'success', msg);
+      disableButtons(false);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('sync-alert', 'error', 'Test sync failed: ' + err.message);
+      disableButtons(false);
+    })
+    .testSync(count);
+}
+
+function clearErrorsAndResetUI() {
+  if (!confirm('Hapus semua error logs dan reset kontak error ke pending?')) return;
+  showLoading('sync-alert', 'Clearing errors...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      showAlert('sync-alert', 'success', data.message || 'Errors cleared');
+      if (currentTab === 'overview') loadOverview();
+    })
+    .withFailureHandler(function(err) {
+      showAlert('sync-alert', 'error', 'Failed: ' + err.message);
+    })
+    .clearErrorsAndReset();
 }
 
 /* === Sync Progress Polling === */
