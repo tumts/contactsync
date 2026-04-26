@@ -188,27 +188,27 @@ function buildPersonResource(contactData) {
   // User-defined fields (for consolidated parent mode)
   var userDefined = [];
   if (contactData.classLabel) {
-    userDefined.push({ key: 'classLabel', value: contactData.classLabel });
+    userDefined.push({ key: 'classLabel', value: String(contactData.classLabel) });
   }
   if (contactData.yearLabel) {
-    userDefined.push({ key: 'yearLabel', value: contactData.yearLabel });
+    userDefined.push({ key: 'yearLabel', value: String(contactData.yearLabel) });
   }
   if (contactData.nisn) {
-    userDefined.push({ key: 'NISN', value: contactData.nisn });
+    userDefined.push({ key: 'NISN', value: String(contactData.nisn) });
   }
 
   if (config.PARENT_CONTACT_MODE === 'consolidated') {
     if (contactData.parentName) {
-      userDefined.push({ key: 'parentName', value: contactData.parentName });
+      userDefined.push({ key: 'parentName', value: String(contactData.parentName) });
     }
     if (contactData.parentPhone) {
-      userDefined.push({ key: 'parentPhone', value: contactData.parentPhone });
+      userDefined.push({ key: 'parentPhone', value: String(contactData.parentPhone) });
     }
     if (contactData.parentEmail) {
-      userDefined.push({ key: 'parentEmail', value: contactData.parentEmail });
+      userDefined.push({ key: 'parentEmail', value: String(contactData.parentEmail) });
     }
     if (contactData.parentRole) {
-      userDefined.push({ key: 'parentRole', value: contactData.parentRole });
+      userDefined.push({ key: 'parentRole', value: String(contactData.parentRole) });
     }
   }
   if (userDefined.length > 0) resource.userDefined = userDefined;
