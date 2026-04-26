@@ -8,9 +8,14 @@
 /* === Globals === */
 var currentTab = 'overview';
 var contactsData = [];
+var filteredContactsData = [];
 var contactsPage = 1;
 var contactsPerPage = 20;
 var logsData = [];
+var activeFilters = {};
+var qualityData = [];
+var qualityFilterType = '';
+var syncProgressInterval = null;
 
 /* === Initialization === */
 document.addEventListener('DOMContentLoaded', function() {
@@ -55,6 +60,7 @@ function switchTab(tabId) {
   else if (tabId === 'wacheck') loadWaTab();
   else if (tabId === 'logs') loadLogs();
   else if (tabId === 'config') loadConfigTab();
+  else if (tabId === 'quality') loadQualityTab();
 }
 
 /* === Notifications === */
@@ -87,7 +93,16 @@ function parseResult(result) {
    TAB 1: OVERVIEW
    ============================================ */
 function loadOverview() {
-  showLoading('overview-cards', 'Loading overview...');
+  var el = document.getElementById('overview-cards');
+  if (el) {
+    el.innerHTML = '<div class="card-grid">' +
+      '<div class="skeleton skeleton-card"></div>' +
+      '<div class="skeleton skeleton-card"></div>' +
+      '<div class="skeleton skeleton-card"></div>' +
+      '<div class="skeleton skeleton-card"></div>' +
+      '<div class="skeleton skeleton-card"></div>' +
+    '</div>';
+  }
   google.script.run
     .withSuccessHandler(function(result) {
       var data = parseResult(result);
@@ -118,6 +133,25 @@ function renderOverviewCards(data) {
   html += buildCard(errors, 'Errors');
   html += '</div>';
   html += '<p style="font-size:12px;color:#888;">Last sync: ' + esc(lastSync) + '</p>';
+
+  var breakdown = (data && data.classBreakdown) || [];
+  if (breakdown.length > 0) {
+    html += '<div class="section-title">Ringkasan per Kelas</div>';
+    html += '<table class="mini-dashboard-table">';
+    html += '<thead><tr><th>Kelas</th><th>Total</th><th>Synced</th><th>Pending</th><th>Errors</th></tr></thead>';
+    html += '<tbody>';
+    for (var b = 0; b < breakdown.length; b++) {
+      var cls = breakdown[b];
+      html += '<tr>';
+      html += '<td>' + esc(cls.classLabel) + '</td>';
+      html += '<td>' + esc(String(cls.total)) + '</td>';
+      html += '<td>' + esc(String(cls.synced)) + '</td>';
+      html += '<td>' + esc(String(cls.pending)) + '</td>';
+      html += '<td>' + esc(String(cls.errors)) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+  }
 
   el.innerHTML = html;
 }
@@ -158,12 +192,20 @@ function disableButtons(disabled) {
    TAB 2: CONTACTS TABLE
    ============================================ */
 function loadContacts() {
-  showLoading('contacts-table-wrap', 'Loading contacts...');
+  var el = document.getElementById('contacts-table-wrap');
+  if (el) {
+    el.innerHTML = '<div class="skeleton skeleton-row" style="width:100%"></div>' +
+      '<div class="skeleton skeleton-row" style="width:90%"></div>' +
+      '<div class="skeleton skeleton-row" style="width:95%"></div>';
+  }
   google.script.run
     .withSuccessHandler(function(result) {
       contactsData = parseResult(result);
       if (!Array.isArray(contactsData)) contactsData = [];
+      filteredContactsData = contactsData.slice();
+      activeFilters = {};
       contactsPage = 1;
+      renderFilterPills();
       renderContactsTable();
     })
     .withFailureHandler(function(err) {
@@ -176,26 +218,29 @@ function renderContactsTable() {
   var el = document.getElementById('contacts-table-wrap');
   if (!el) return;
 
-  if (contactsData.length === 0) {
+  var data = filteredContactsData;
+  if (data.length === 0) {
     el.innerHTML = '<div class="alert alert-info">No contacts found. Run "Scan DataSiswa" first.</div>';
     return;
   }
 
-  var totalPages = Math.ceil(contactsData.length / contactsPerPage);
+  var totalPages = Math.ceil(data.length / contactsPerPage);
   var start = (contactsPage - 1) * contactsPerPage;
-  var end = Math.min(start + contactsPerPage, contactsData.length);
-  var pageData = contactsData.slice(start, end);
+  var end = Math.min(start + contactsPerPage, data.length);
+  var pageData = data.slice(start, end);
 
   var html = '<div class="table-wrap"><table>';
   html += '<thead><tr>';
-  html += '<th>Name</th><th>Class</th><th>Phone</th><th>Email</th><th>WA Status</th><th>Sync Status</th>';
+  html += '<th>Name</th><th>Class</th><th>Status</th><th>Phone</th><th>Email</th><th>WA Status</th><th>Sync Status</th>';
   html += '</tr></thead><tbody>';
 
   for (var i = 0; i < pageData.length; i++) {
     var c = pageData[i];
-    html += '<tr>';
+    var globalIdx = start + i;
+    html += '<tr class="clickable-row" onclick="showContactDetail(' + globalIdx + ')">';
     html += '<td>' + esc(c.fullName) + '</td>';
     html += '<td>' + esc(c.classLabel) + '</td>';
+    html += '<td>' + buildStatusBadge(c.studentStatus) + '</td>';
     html += '<td>' + esc(c.phonePrimary) + '</td>';
     html += '<td>' + esc(c.emailPrimary) + '</td>';
     html += '<td>' + buildWaDot(c.waPhoneStatus) + '</td>';
@@ -207,11 +252,19 @@ function renderContactsTable() {
 
   html += '<div class="pagination">';
   html += '<button onclick="prevContactsPage()" ' + (contactsPage <= 1 ? 'disabled' : '') + '>Prev</button>';
-  html += '<span class="page-info">Page ' + contactsPage + ' of ' + totalPages + ' (' + contactsData.length + ' total)</span>';
+  html += '<span class="page-info">Page ' + contactsPage + ' of ' + totalPages + ' (' + data.length + ' total)</span>';
   html += '<button onclick="nextContactsPage()" ' + (contactsPage >= totalPages ? 'disabled' : '') + '>Next</button>';
   html += '</div>';
 
   el.innerHTML = html;
+}
+
+function buildStatusBadge(status) {
+  var s = String(status || '').trim().toLowerCase();
+  if (s === 'aktif') return '<span class="badge badge-green">aktif</span>';
+  if (s === 'berhenti') return '<span class="badge badge-yellow">berhenti</span>';
+  if (s === 'lulus') return '<span class="badge badge-gray">lulus</span>';
+  return '<span class="badge badge-gray">' + esc(s || '-') + '</span>';
 }
 
 function buildWaDot(status) {
@@ -237,8 +290,178 @@ function prevContactsPage() {
 }
 
 function nextContactsPage() {
-  var totalPages = Math.ceil(contactsData.length / contactsPerPage);
+  var totalPages = Math.ceil(filteredContactsData.length / contactsPerPage);
   if (contactsPage < totalPages) { contactsPage++; renderContactsTable(); }
+}
+
+/* === Contacts Search & Filter === */
+function filterContacts() {
+  var searchEl = document.getElementById('contacts-search');
+  var keyword = searchEl ? searchEl.value.trim().toLowerCase() : '';
+
+  filteredContactsData = [];
+  for (var i = 0; i < contactsData.length; i++) {
+    var c = contactsData[i];
+    var matchesKeyword = true;
+    if (keyword) {
+      var searchFields = [
+        String(c.fullName || '').toLowerCase(),
+        String(c.phonePrimary || '').toLowerCase(),
+        String(c.emailPrimary || '').toLowerCase(),
+        String(c.classLabel || '').toLowerCase()
+      ].join(' ');
+      matchesKeyword = searchFields.indexOf(keyword) !== -1;
+    }
+
+    var matchesFilter = true;
+    var filterKeys = Object.keys(activeFilters);
+    for (var f = 0; f < filterKeys.length; f++) {
+      var fType = filterKeys[f];
+      var fVal = activeFilters[fType];
+      if (fVal) {
+        var contactVal = String(c[fType] || '').trim();
+        if (contactVal !== fVal) {
+          matchesFilter = false;
+          break;
+        }
+      }
+    }
+
+    if (matchesKeyword && matchesFilter) {
+      filteredContactsData.push(c);
+    }
+  }
+
+  contactsPage = 1;
+  renderContactsTable();
+}
+
+function renderFilterPills() {
+  var el = document.getElementById('contacts-filter-pills');
+  if (!el) return;
+
+  var classValues = {};
+  var syncValues = {};
+  var waValues = {};
+  var statusValues = {};
+
+  for (var i = 0; i < contactsData.length; i++) {
+    var c = contactsData[i];
+    var cl = String(c.classLabel || '').trim();
+    var ss = String(c.syncStatus || '').trim();
+    var ws = String(c.waPhoneStatus || '').trim();
+    var st = String(c.studentStatus || '').trim();
+    if (cl) classValues[cl] = true;
+    if (ss) syncValues[ss] = true;
+    if (ws) waValues[ws] = true;
+    if (st) statusValues[st] = true;
+  }
+
+  var html = '<strong style="font-size:11px;color:#888;margin-right:4px;">Kelas:</strong>';
+  var classes = Object.keys(classValues).sort();
+  for (var c = 0; c < classes.length; c++) {
+    var active = activeFilters.classLabel === classes[c] ? ' active' : '';
+    html += '<span class="filter-pill' + active + '" onclick="toggleFilterPill(\'classLabel\',\'' + esc(classes[c]) + '\')">' + esc(classes[c]) + '</span>';
+  }
+
+  html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">Sync:</strong>';
+  var syncs = Object.keys(syncValues).sort();
+  for (var s = 0; s < syncs.length; s++) {
+    var active2 = activeFilters.syncStatus === syncs[s] ? ' active' : '';
+    html += '<span class="filter-pill' + active2 + '" onclick="toggleFilterPill(\'syncStatus\',\'' + esc(syncs[s]) + '\')">' + esc(syncs[s]) + '</span>';
+  }
+
+  html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">WA:</strong>';
+  var was = Object.keys(waValues).sort();
+  for (var w = 0; w < was.length; w++) {
+    var active3 = activeFilters.waPhoneStatus === was[w] ? ' active' : '';
+    html += '<span class="filter-pill' + active3 + '" onclick="toggleFilterPill(\'waPhoneStatus\',\'' + esc(was[w]) + '\')">' + esc(was[w]) + '</span>';
+  }
+
+  var statuses = Object.keys(statusValues).sort();
+  if (statuses.length > 0) {
+    html += ' <strong style="font-size:11px;color:#888;margin-right:4px;margin-left:8px;">Status:</strong>';
+    for (var t = 0; t < statuses.length; t++) {
+      var active4 = activeFilters.studentStatus === statuses[t] ? ' active' : '';
+      html += '<span class="filter-pill' + active4 + '" onclick="toggleFilterPill(\'studentStatus\',\'' + esc(statuses[t]) + '\')">' + esc(statuses[t]) + '</span>';
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function toggleFilterPill(type, value) {
+  if (activeFilters[type] === value) {
+    delete activeFilters[type];
+  } else {
+    activeFilters[type] = value;
+  }
+  renderFilterPills();
+  filterContacts();
+}
+
+/* === Contact Detail Modal === */
+function showContactDetail(index) {
+  var c = filteredContactsData[index];
+  if (!c) return;
+
+  var fields = [
+    ['Full Name', c.fullName],
+    ['Given Name', c.givenName],
+    ['Family Name', c.familyName],
+    ['Middle Name', c.middleName],
+    ['Nickname', c.nickname],
+    ['Class', c.classLabel],
+    ['Year', c.yearLabel],
+    ['Student Status', c.studentStatus],
+    ['Phone Primary', c.phonePrimary],
+    ['Phone Secondary', c.phoneSecondary],
+    ['Email Primary', c.emailPrimary],
+    ['Email Secondary', c.emailSecondary],
+    ['Organization', c.organization],
+    ['Job Title', c.jobTitle],
+    ['Parent Name', c.parentName],
+    ['Parent Phone', c.parentPhone],
+    ['Parent Email', c.parentEmail],
+    ['Parent Role', c.parentRole],
+    ['WA Status', c.waPhoneStatus],
+    ['Sync Status', c.syncStatus],
+    ['Google Resource', c.googleResourceName],
+    ['Labels', c.labels],
+    ['Birthday', c.birthday],
+    ['Notes', c.notes],
+    ['Last Synced', c.lastSyncedAt],
+    ['Last Error', c.lastError]
+  ];
+
+  var html = '<div class="modal-overlay" onclick="closeContactModal(event)">';
+  html += '<div class="modal-content">';
+  html += '<button class="modal-close" onclick="closeContactModal(event)">&times;</button>';
+  html += '<div class="modal-title">' + esc(c.fullName || '(no name)') + '</div>';
+
+  for (var f = 0; f < fields.length; f++) {
+    var val = String(fields[f][1] || '').trim();
+    if (!val) continue;
+    html += '<div class="modal-field">';
+    html += '<div class="modal-field-label">' + esc(fields[f][0]) + '</div>';
+    html += '<div class="modal-field-value">' + esc(val) + '</div>';
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+
+  var modalEl = document.getElementById('contact-modal');
+  if (modalEl) modalEl.innerHTML = html;
+}
+
+function closeContactModal(event) {
+  if (event) {
+    var target = event.target;
+    if (target.classList.contains('modal-overlay') || target.classList.contains('modal-close')) {
+      var modalEl = document.getElementById('contact-modal');
+      if (modalEl) modalEl.innerHTML = '';
+    }
+  }
 }
 
 /* ============================================
@@ -284,9 +507,11 @@ function updateNamingPreview() {
 function runPreviewSync() {
   showLoading('sync-alert', 'Running preview sync (dry-run)...');
   disableButtons(true);
+  startSyncPolling();
 
   google.script.run
     .withSuccessHandler(function(result) {
+      stopSyncPolling();
       var data = parseResult(result);
       var msg = 'Preview: ' + (data.create || 0) + ' create, ' +
         (data.update || 0) + ' update, ' +
@@ -300,6 +525,7 @@ function runPreviewSync() {
       renderSyncProgress(data);
     })
     .withFailureHandler(function(err) {
+      stopSyncPolling();
       showAlert('sync-alert', 'error', 'Preview failed: ' + err.message);
       disableButtons(false);
     })
@@ -309,9 +535,11 @@ function runPreviewSync() {
 function runExecuteSync() {
   showLoading('sync-alert', 'Executing sync to Google Contacts...');
   disableButtons(true);
+  startSyncPolling();
 
   google.script.run
     .withSuccessHandler(function(result) {
+      stopSyncPolling();
       var data = parseResult(result);
       var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
         (data.errors || 0) + ' errors, ' +
@@ -324,10 +552,39 @@ function runExecuteSync() {
       renderSyncProgress(data);
     })
     .withFailureHandler(function(err) {
+      stopSyncPolling();
       showAlert('sync-alert', 'error', 'Sync failed: ' + err.message);
       disableButtons(false);
     })
     .runSync();
+}
+
+/* === Sync Progress Polling === */
+function startSyncPolling() {
+  stopSyncPolling();
+  syncProgressInterval = setInterval(function() {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        var data = parseResult(result);
+        if (data.preview || data.run) {
+          var progress = data.preview || data.run;
+          renderSyncProgress({
+            processed: progress.lastIndex || 0,
+            total: progress.total || 0,
+            complete: false
+          });
+        }
+      })
+      .withFailureHandler(function() {})
+      .getSyncProgress();
+  }, 3000);
+}
+
+function stopSyncPolling() {
+  if (syncProgressInterval) {
+    clearInterval(syncProgressInterval);
+    syncProgressInterval = null;
+  }
 }
 
 function renderSyncProgress(data) {
@@ -352,12 +609,14 @@ function saveSyncConfig() {
   var yearLabel = document.getElementById('sync-year-label');
   var presetSelect = document.getElementById('sync-preset');
   var parentMode = document.querySelector('input[name="parent-mode"]:checked');
+  var studentStatus = document.getElementById('sync-student-status');
 
   var updates = {};
   if (classLabel) updates.DEFAULT_CLASS_LABEL = classLabel.value;
   if (yearLabel) updates.DEFAULT_YEAR_LABEL = yearLabel.value;
   if (presetSelect) updates.NAMING_PRESET = presetSelect.value;
   if (parentMode) updates.PARENT_CONTACT_MODE = parentMode.value;
+  if (studentStatus) updates.DEFAULT_STUDENT_STATUS = studentStatus.value;
 
   var keys = Object.keys(updates);
   for (var i = 0; i < keys.length; i++) {
@@ -588,7 +847,7 @@ function renderConfigForm(config) {
   var groups = {
     'Source': ['SOURCE_SPREADSHEET_ID', 'SOURCE_SHEET'],
     'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
-    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL'],
+    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL', 'DEFAULT_STUDENT_STATUS'],
     'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
     'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_DEVICE_JID', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS', 'WA_API_JITTER_MS', 'WA_API_BATCH_SIZE', 'WA_API_BATCH_PAUSE_MS', 'WA_API_DAILY_LIMIT', 'WA_API_RECHECK_DAYS'],
     'Advanced': ['DEBUG_MODE']
@@ -608,7 +867,13 @@ function renderConfigForm(config) {
       html += '<div class="form-group">';
       html += '<label for="cfg-' + esc(key) + '">' + esc(key) + '</label>';
 
-      if (key === 'PARENT_CONTACT_MODE') {
+      if (key === 'DEFAULT_STUDENT_STATUS') {
+        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+        html += '<option value="aktif"' + (val === 'aktif' ? ' selected' : '') + '>aktif</option>';
+        html += '<option value="berhenti"' + (val === 'berhenti' ? ' selected' : '') + '>berhenti</option>';
+        html += '<option value="lulus"' + (val === 'lulus' ? ' selected' : '') + '>lulus</option>';
+        html += '</select>';
+      } else if (key === 'PARENT_CONTACT_MODE') {
         html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
         html += '<option value="consolidated"' + (val === 'consolidated' ? ' selected' : '') + '>Consolidated</option>';
         html += '<option value="separate"' + (val === 'separate' ? ' selected' : '') + '>Separate</option>';
@@ -658,5 +923,113 @@ function resetConfigDefaults() {
   if (!confirm('Reset all config to defaults?')) return;
   loadConfigTab();
   showAlert('config-alert', 'info', 'Form reset to current values. Edit and save to apply defaults.');
+}
+
+/* ============================================
+   TAB 7: DATA QUALITY
+   ============================================ */
+function loadQualityTab() {
+  showLoading('quality-table-wrap', 'Loading quality report...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      qualityData = (data && data.data) || [];
+      qualityFilterType = '';
+      renderInvalidTable(qualityData);
+      var summary = 'Total: ' + (data.total || 0) + ' contacts, ' + (data.invalid || 0) + ' invalid';
+      showAlert('quality-alert', data.invalid > 0 ? 'warning' : 'success', summary);
+    })
+    .withFailureHandler(function(err) {
+      showAlert('quality-alert', 'error', 'Failed to load quality data: ' + err.message);
+    })
+    .getInvalidContacts();
+}
+
+function renderInvalidTable(data) {
+  var el = document.getElementById('quality-table-wrap');
+  if (!el) return;
+
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="alert alert-success">All contacts are valid!</div>';
+    return;
+  }
+
+  var html = '<div class="table-wrap"><table>';
+  html += '<thead><tr>';
+  html += '<th>Row#</th><th>Name</th><th>Phone</th><th>Email</th><th>Class</th><th>Errors</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var i = 0; i < data.length; i++) {
+    var d = data[i];
+    html += '<tr>';
+    html += '<td>' + esc(String(d.row)) + '</td>';
+    html += '<td>' + esc(d.fullName) + '</td>';
+    html += '<td>' + esc(d.phonePrimary) + '</td>';
+    html += '<td>' + esc(d.emailPrimary) + '</td>';
+    html += '<td>' + esc(d.classLabel) + '</td>';
+    html += '<td>';
+    var errs = d.errors || [];
+    for (var e = 0; e < errs.length; e++) {
+      html += '<span class="badge badge-red" style="margin:2px;">' + esc(errs[e]) + '</span>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function filterInvalidByType(type) {
+  qualityFilterType = type;
+
+  var pills = document.querySelectorAll('#quality-filter-pills .filter-pill');
+  for (var p = 0; p < pills.length; p++) {
+    pills[p].classList.remove('active');
+  }
+
+  if (!type) {
+    if (pills.length > 0) pills[0].classList.add('active');
+    renderInvalidTable(qualityData);
+    return;
+  }
+
+  var el = event && event.target;
+  if (el) el.classList.add('active');
+
+  var filtered = [];
+  for (var i = 0; i < qualityData.length; i++) {
+    var errs = qualityData[i].errors || [];
+    for (var e = 0; e < errs.length; e++) {
+      if (errs[e].indexOf(type) !== -1) {
+        filtered.push(qualityData[i]);
+        break;
+      }
+    }
+  }
+  renderInvalidTable(filtered);
+}
+
+function exportInvalidCSV() {
+  showLoading('quality-alert', 'Generating CSV...');
+
+  google.script.run
+    .withSuccessHandler(function(csvString) {
+      var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'invalid_contacts_siswahub.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showAlert('quality-alert', 'success', 'CSV exported successfully');
+    })
+    .withFailureHandler(function(err) {
+      showAlert('quality-alert', 'error', 'Export failed: ' + err.message);
+    })
+    .exportInvalidAsCSV();
 }
 </script>

@@ -1,5 +1,5 @@
 /**
- * NamingService.gs — Contact naming engine with 5 presets.
+ * NamingService.gs — Contact naming engine with 3 presets (pure names only).
  */
 
 /**
@@ -8,26 +8,23 @@
  */
 function getNamePresets() {
   return [
-    { id: 1, label: 'Dash separated', pattern: '{fullName} - {classLabel} - {yearLabel}' },
-    { id: 2, label: 'Slash separated', pattern: '{fullName} / {classLabel} / {yearLabel}' },
-    { id: 3, label: 'Parenthesized', pattern: '{fullName} ({classLabel} {yearLabel})' },
-    { id: 4, label: 'Organization style', pattern: '{fullName} - {organization} {classLabel}' },
-    { id: 5, label: 'Bracketed', pattern: '{fullName} [{classLabel}] {yearLabel}' }
+    { id: 1, label: 'First Last', pattern: '{givenName} {familyName}' },
+    { id: 2, label: 'Last, First', pattern: '{familyName}, {givenName}' },
+    { id: 3, label: 'Full Name', pattern: '{fullName}' }
   ];
 }
 
 /**
  * Apply a naming preset to a data row.
- * @param {number} presetId Preset ID (1-5).
- * @param {Object} data Row data with fullName, classLabel, yearLabel, organization.
+ * Only replaces givenName, familyName, fullName — no metadata.
+ * @param {number} presetId Preset ID (1-3).
+ * @param {Object} data Row data with fullName, givenName, familyName.
  * @return {string} Formatted contact name.
  */
 function applyNamingPreset(presetId, data) {
-  var config = loadConfig();
   var fullName = String(data.fullName || '').trim();
-  var classLabel = String(data.classLabel || config.DEFAULT_CLASS_LABEL || '').trim();
-  var yearLabel = String(data.yearLabel || config.DEFAULT_YEAR_LABEL || '').trim();
-  var organization = String(data.organization || config.DEFAULT_ORGANIZATION || '').trim();
+  var givenName = String(data.givenName || '').trim();
+  var familyName = String(data.familyName || '').trim();
 
   var presets = getNamePresets();
   var preset = null;
@@ -42,9 +39,8 @@ function applyNamingPreset(presetId, data) {
 
   var result = preset.pattern
     .replace('{fullName}', fullName)
-    .replace('{classLabel}', classLabel)
-    .replace('{yearLabel}', yearLabel)
-    .replace('{organization}', organization);
+    .replace('{givenName}', givenName)
+    .replace('{familyName}', familyName);
 
   return result.replace(/\s+/g, ' ').trim();
 }
@@ -57,9 +53,8 @@ function applyNamingPreset(presetId, data) {
 function previewNaming(presetId) {
   var sampleData = {
     fullName: 'Ahmad Fauzi',
-    classLabel: '7A',
-    yearLabel: '2026',
-    organization: 'MTs Al Amin'
+    givenName: 'Ahmad',
+    familyName: 'Fauzi'
   };
 
   var presets = getNamePresets();

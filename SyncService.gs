@@ -40,6 +40,8 @@ function scanDataSiswa() {
     mapped.id = String(i + 1);
     mapped.syncStatus = 'pending';
     mapped.namingPattern = applyNamingPreset(presetId, mapped);
+    mapped.studentStatus = mapped.studentStatus || config.DEFAULT_STUDENT_STATUS || 'aktif';
+    mapped.labels = buildLabels(mapped.classLabel, mapped.yearLabel, mapped.studentStatus);
     mapped.dedupeKey = generateDedupeKey(mapped.fullName, mapped.phonePrimary, mapped.emailPrimary);
 
     contacts.push(mapped);

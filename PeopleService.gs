@@ -143,10 +143,12 @@ function buildPersonResource(contactData) {
 
   // Names
   var nameParts = splitFullName(contactData.fullName || '');
-  resource.names = [{
+  var nameObj = {
     givenName: contactData.givenName || nameParts.givenName,
     familyName: contactData.familyName || nameParts.familyName
-  }];
+  };
+  if (contactData.middleName) nameObj.middleName = contactData.middleName;
+  resource.names = [nameObj];
 
   // Email addresses
   var emails = [];
@@ -224,22 +226,97 @@ function buildPersonResource(contactData) {
     resource.biographies = [{ value: contactData.notes, contentType: 'TEXT_PLAIN' }];
   }
 
-  // Group membership
+  // Nicknames
+  if (contactData.nickname) {
+    resource.nicknames = [{ value: contactData.nickname }];
+  }
+
+  // Birthday
+  if (contactData.birthday) {
+    var bday = parseBirthday(contactData.birthday);
+    if (bday) {
+      resource.birthdays = [{ date: bday }];
+    }
+  }
+
+  // Group membership — support multiple labels
+  var memberships = [];
   var groupName = contactData.groupName || config.DEFAULT_GROUP_NAME || '';
   if (groupName) {
     try {
       var group = getOrCreateContactGroup(groupName);
       if (group && group.resourceName) {
-        resource.memberships = [{
+        memberships.push({
           contactGroupMembership: { contactGroupResourceName: group.resourceName }
-        }];
+        });
       }
-    } catch (e) {
-      // Skip group if error
+    } catch (e) {}
+  }
+
+  var labelsStr = String(contactData.labels || '').trim();
+  if (labelsStr) {
+    var labelParts = labelsStr.split(':::');
+    for (var lp = 0; lp < labelParts.length; lp++) {
+      var labelName = labelParts[lp].trim();
+      if (labelName) {
+        try {
+          var labelGroup = getOrCreateContactGroup(labelName);
+          if (labelGroup && labelGroup.resourceName) {
+            var alreadyAdded = false;
+            for (var m = 0; m < memberships.length; m++) {
+              if (memberships[m].contactGroupMembership &&
+                  memberships[m].contactGroupMembership.contactGroupResourceName === labelGroup.resourceName) {
+                alreadyAdded = true;
+                break;
+              }
+            }
+            if (!alreadyAdded) {
+              memberships.push({
+                contactGroupMembership: { contactGroupResourceName: labelGroup.resourceName }
+              });
+            }
+          }
+        } catch (e) {}
+      }
     }
   }
 
+  if (memberships.length > 0) {
+    resource.memberships = memberships;
+  }
+
   return resource;
+}
+
+/**
+ * Parse a birthday string into a People API date object.
+ * @param {string} birthday Birthday in YYYY-MM-DD or --MM-DD format.
+ * @return {Object|null} { year, month, day } or null.
+ */
+function parseBirthday(birthday) {
+  var s = String(birthday || '').trim();
+  if (!s) return null;
+
+  if (s.indexOf('--') === 0) {
+    var parts = s.substring(2).split('-');
+    if (parts.length === 2) {
+      return {
+        month: parseInt(parts[0], 10),
+        day: parseInt(parts[1], 10)
+      };
+    }
+  }
+
+  var fullParts = s.split('-');
+  if (fullParts.length === 3) {
+    return {
+      year: parseInt(fullParts[0], 10),
+      month: parseInt(fullParts[1], 10),
+      day: parseInt(fullParts[2], 10)
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -278,7 +355,7 @@ function updateGoogleContact(resourceName, etag, contactData) {
     var resource = buildPersonResource(contactData);
     resource.etag = etag;
 
-    var updateFields = 'names,emailAddresses,phoneNumbers,organizations,addresses,userDefined,relations,biographies';
+    var updateFields = 'names,emailAddresses,phoneNumbers,organizations,addresses,userDefined,relations,biographies,nicknames,birthdays,memberships';
     var person = People.People.updateContact(resource, resourceName, {
       updatePersonFields: updateFields
     });
@@ -300,7 +377,7 @@ function updateGoogleContact(resourceName, etag, contactData) {
         var resource2 = buildPersonResource(contactData);
         resource2.etag = fresh.etag;
 
-        var updateFields2 = 'names,emailAddresses,phoneNumbers,organizations,addresses,userDefined,relations,biographies';
+        var updateFields2 = 'names,emailAddresses,phoneNumbers,organizations,addresses,userDefined,relations,biographies,nicknames,birthdays,memberships';
         var person2 = People.People.updateContact(resource2, resourceName, {
           updatePersonFields: updateFields2
         });

@@ -15,6 +15,16 @@ function validateRow(row) {
     errors.push('fullName is required');
   }
 
+  var classLabel = String(row.classLabel || '').trim();
+  if (!classLabel) {
+    errors.push('classLabel is empty');
+  }
+
+  var yearLabel = String(row.yearLabel || '').trim();
+  if (!yearLabel) {
+    errors.push('yearLabel is empty');
+  }
+
   var phonePrimary = String(row.phonePrimary || '').trim();
   var emailPrimary = String(row.emailPrimary || '').trim();
 
@@ -48,6 +58,19 @@ function validateRow(row) {
     var parentPhoneDigits = String(row.parentPhone).replace(/\D/g, '');
     if (parentPhoneDigits && (parentPhoneDigits.indexOf('62') !== 0 || parentPhoneDigits.length < 10 || parentPhoneDigits.length > 15)) {
       errors.push('parentPhone must be 62xxx format (10-15 digits)');
+    }
+  }
+
+  var studentStatus = String(row.studentStatus || '').trim();
+  if (studentStatus && ['aktif', 'berhenti', 'lulus'].indexOf(studentStatus) === -1) {
+    errors.push('studentStatus must be aktif, berhenti, or lulus');
+  }
+
+  var birthday = String(row.birthday || '').trim();
+  if (birthday) {
+    var bdayPattern = /^(\d{4}-\d{2}-\d{2}|--\d{2}-\d{2})$/;
+    if (!bdayPattern.test(birthday)) {
+      errors.push('birthday must be YYYY-MM-DD or --MM-DD format');
     }
   }
 
