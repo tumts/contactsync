@@ -139,6 +139,16 @@ function getContactsList() {
 }
 
 /**
+ * Send cancel signal to a running sync/preview process.
+ * @return {string} JSON result.
+ */
+function cancelSync() {
+  PropertiesService.getScriptProperties().setProperty('SYNC_CANCEL', 'true');
+  logAction('system', 'sync', 'warning', 'Cancel signal sent by user', '');
+  return JSON.stringify({ success: true, message: 'Cancel signal sent. Sync will stop at next checkpoint.' });
+}
+
+/**
  * Get sync progress from PropertiesService.
  * @return {Object} Progress info for preview and run sync.
  */
