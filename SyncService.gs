@@ -63,17 +63,18 @@ function scanDataSiswa() {
           phonePrimary: normalizePhoneNumber(row['wa_ayah']),
           phoneSecondary: '',
           organization: organization,
-          jobTitle: '',
-          classLabel: '',
+          jobTitle: 'Wali Murid',
+          classLabel: mapped.classLabel,
           yearLabel: yearLabel,
           address: '',
-          notes: 'Ayah dari ' + mapped.fullName,
+          notes: 'Ayah dari ' + mapped.fullName + ' (' + mapped.classLabel + ')',
           parentName: '',
           parentPhone: '',
           parentEmail: '',
           parentRole: 'Ayah',
           relationshipLabel: 'father',
-          groupName: groupName,
+          groupName: config.DEFAULT_PARENT_GROUP_NAME || ('Orangtua ' + (organization || '')),
+          labels: '',
           googleResourceName: '',
           googleEtag: '',
           syncStatus: 'pending',
@@ -82,11 +83,13 @@ function scanDataSiswa() {
           sourceUpdatedAt: '',
           waPhoneStatus: '',
           waPhoneCheckedAt: '',
-          namingPattern: fatherName,
+          namingPattern: applyNamingPreset(presetId, { fullName: fatherName, givenName: fatherParts.givenName, familyName: fatherParts.familyName }),
           syncPreviewAction: '',
-          dedupeKey: generateDedupeKey(fatherName, normalizePhoneNumber(row['wa_ayah']), cleanEmail(row['email_ayah']))
+          dedupeKey: generateDedupeKey(fatherName, normalizePhoneNumber(row['wa_ayah']), cleanEmail(row['email_ayah'])),
+          studentStatus: ''
         };
         contacts.push(fatherContact);
+        fatherContact.labels = buildParentLabels(mapped.classLabel, yearLabel, 'Ayah');
         parentCount++;
       }
 
@@ -104,17 +107,18 @@ function scanDataSiswa() {
           phonePrimary: normalizePhoneNumber(row['wa_ibu']),
           phoneSecondary: '',
           organization: organization,
-          jobTitle: '',
-          classLabel: '',
+          jobTitle: 'Wali Murid',
+          classLabel: mapped.classLabel,
           yearLabel: yearLabel,
           address: '',
-          notes: 'Ibu dari ' + mapped.fullName,
+          notes: 'Ibu dari ' + mapped.fullName + ' (' + mapped.classLabel + ')',
           parentName: '',
           parentPhone: '',
           parentEmail: '',
           parentRole: 'Ibu',
           relationshipLabel: 'mother',
-          groupName: groupName,
+          groupName: config.DEFAULT_PARENT_GROUP_NAME || ('Orangtua ' + (organization || '')),
+          labels: '',
           googleResourceName: '',
           googleEtag: '',
           syncStatus: 'pending',
@@ -123,11 +127,13 @@ function scanDataSiswa() {
           sourceUpdatedAt: '',
           waPhoneStatus: '',
           waPhoneCheckedAt: '',
-          namingPattern: motherName,
+          namingPattern: applyNamingPreset(presetId, { fullName: motherName, givenName: motherParts.givenName, familyName: motherParts.familyName }),
           syncPreviewAction: '',
-          dedupeKey: generateDedupeKey(motherName, normalizePhoneNumber(row['wa_ibu']), cleanEmail(row['email_ibu']))
+          dedupeKey: generateDedupeKey(motherName, normalizePhoneNumber(row['wa_ibu']), cleanEmail(row['email_ibu'])),
+          studentStatus: ''
         };
         contacts.push(motherContact);
+        motherContact.labels = buildParentLabels(mapped.classLabel, yearLabel, 'Ibu');
         parentCount++;
       }
     }

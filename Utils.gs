@@ -126,6 +126,22 @@ function buildLabels(classLabel, yearLabel, studentStatus) {
 }
 
 /**
+ * Build labels string for parent contacts.
+ * @param {string} classLabel Child's class label.
+ * @param {string} yearLabel Year label.
+ * @param {string} parentRole 'Ayah' or 'Ibu'.
+ * @return {string} Labels string separated by ' ::: '.
+ */
+function buildParentLabels(classLabel, yearLabel, parentRole) {
+  var parts = [];
+  if (classLabel) parts.push('Kelas ' + String(classLabel).trim());
+  if (yearLabel) parts.push('TA ' + String(yearLabel).trim());
+  parts.push('Orangtua');
+  if (parentRole) parts.push(String(parentRole).trim());
+  return parts.join(' ::: ');
+}
+
+/**
  * Split a full name into givenName and familyName.
  * @param {string} fullName Full name string.
  * @return {Object} { givenName, familyName }
