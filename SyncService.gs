@@ -161,6 +161,7 @@ function previewSync() {
 
   var startTime = new Date().getTime();
   var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('SYNC_CANCEL');
   var startIndex = 0;
 
   // Check for resumed progress
@@ -304,6 +305,7 @@ function runSync() {
 
   var startTime = new Date().getTime();
   var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('SYNC_CANCEL');
   var startIndex = 0;
 
   var savedProgress = props.getProperty('runSync_progress');

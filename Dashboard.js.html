@@ -509,7 +509,7 @@ function runPreviewSync() {
   disableButtons(true);
   startSyncPolling();
   var cancelBtn = document.getElementById('btn-cancel-sync');
-  if (cancelBtn) cancelBtn.style.display = 'inline-block';
+  if (cancelBtn) { cancelBtn.style.display = 'inline-block'; cancelBtn.disabled = false; }
 
   google.script.run
     .withSuccessHandler(function(result) {
@@ -551,7 +551,7 @@ function runExecuteSync() {
   disableButtons(true);
   startSyncPolling();
   var cancelBtn = document.getElementById('btn-cancel-sync');
-  if (cancelBtn) cancelBtn.style.display = 'inline-block';
+  if (cancelBtn) { cancelBtn.style.display = 'inline-block'; cancelBtn.disabled = false; }
 
   google.script.run
     .withSuccessHandler(function(result) {

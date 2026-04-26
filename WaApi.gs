@@ -205,6 +205,7 @@ function batchCheckNumbers(phoneList) {
   var batchPause = parseInt(config.WA_API_BATCH_PAUSE_MS) || 60000;
   var startTime = new Date().getTime();
   var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('SYNC_CANCEL');
   var startIndex = 0;
 
   var savedProgress = props.getProperty('batchCheck_progress');
