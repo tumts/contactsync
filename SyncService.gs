@@ -382,6 +382,12 @@ function runSync() {
       continue;
     }
 
+    // Skip already-synced contacts to prevent duplicates after clearErrorsAndReset
+    if (String(c.syncStatus || '').trim() === 'synced') {
+      skippedCount++;
+      continue;
+    }
+
     var result;
     if (action === 'create') {
       result = createGoogleContact(c);

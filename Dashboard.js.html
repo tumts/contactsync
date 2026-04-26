@@ -184,7 +184,7 @@ function runAction(actionName, alertId) {
       var data = parseResult(result);
       var msg = data.message || (actionName + ' completed successfully');
       if (data.stoppedOnError) {
-        msg = 'Sync stopped: ' + (data.errors || 0) + ' consecutive errors. ' + (data.synced || 0) + ' synced.';
+        msg = data.message || ('Sync stopped: ' + (data.errors || 0) + ' errors. ' + (data.synced || 0) + ' synced.');
         showAlert(alertId, 'error', msg);
       } else {
         showAlert(alertId, 'success', msg);
