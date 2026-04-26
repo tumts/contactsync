@@ -66,6 +66,18 @@ function openSidebarShortcut() {
 }
 
 /**
+ * Open the full config dialog from sidebar.
+ */
+function openConfigDialog() {
+  var html = HtmlService.createTemplateFromFile('ConfigDialog')
+    .evaluate()
+    .setTitle('ContactSync Config')
+    .setWidth(700)
+    .setHeight(500);
+  SpreadsheetApp.getUi().showModalDialog(html, 'ContactSync Config');
+}
+
+/**
  * Get overview data for the dashboard.
  * @return {Object} Overview summary.
  */

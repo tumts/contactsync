@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <?!= include('Dashboard.css'); ?>
+</head>
+<body>
+  <div style="padding:16px;">
+    <h2 style="font-size:18px;color:#1a73e8;margin-bottom:16px;">Configuration</h2>
+    <div id="config-alert"></div>
+    <div id="config-form-area">
+      <div style="text-align:center;color:#888;font-size:12px;">Loading...</div>
+    </div>
+    <div class="btn-group" style="margin-top:16px;">
+      <button class="btn btn-success" onclick="saveAllConfig()">Save Config</button>
+      <button class="btn btn-secondary" onclick="resetConfigDefaults()">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <script>
+    function esc(str) {
+      if (!str && str !== 0) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function parseResult(result) {
+      if (typeof result === 'string') {
+        try { return JSON.parse(result); } catch(e) { return { raw: result }; }
+      }
+      return result;
+    }
+
+    function showAlert(containerId, type, message) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '<div class="alert alert-' + type + '">' + esc(message) + '</div>';
+    }
+
+    function showLoading(containerId, message) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '<span style="color:#666;font-size:13px;">' + esc(message || 'Loading...') + '</span>';
+    }
+
+    function loadConfigTab() {
+      showLoading('config-form-area', 'Loading config...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          var config = parseResult(result);
+          renderConfigForm(config);
+        })
+        .withFailureHandler(function(err) {
+          showAlert('config-alert', 'error', 'Failed to load config: ' + err.message);
+        })
+        .loadConfig();
+    }
+
+    function renderConfigForm(config) {
+      var el = document.getElementById('config-form-area');
+      if (!el) return;
+
+      var groups = {
+        'Source': ['SOURCE_SPREADSHEET_ID', 'SOURCE_SHEET'],
+        'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
+        'Naming': ['NAMING_PRESET', 'DEFAULT_YEAR_LABEL', 'DEFAULT_STUDENT_STATUS'],
+        'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
+        'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS', 'WA_API_JITTER_MS', 'WA_API_BATCH_SIZE', 'WA_API_BATCH_PAUSE_MS', 'WA_API_DAILY_LIMIT', 'WA_API_RECHECK_DAYS'],
+        'Advanced': ['DEBUG_MODE', 'SYNC_MAX_CONSECUTIVE_ERRORS']
+      };
+
+      var html = '';
+      var groupNames = Object.keys(groups);
+      for (var g = 0; g < groupNames.length; g++) {
+        var groupName = groupNames[g];
+        var keys = groups[groupName];
+        html += '<div class="config-group">';
+        html += '<div class="config-group-title">' + esc(groupName) + '</div>';
+
+        for (var k = 0; k < keys.length; k++) {
+          var key = keys[k];
+          var val = config[key] !== undefined ? String(config[key]) : '';
+          html += '<div class="form-group">';
+          html += '<label for="cfg-' + esc(key) + '">' + esc(key) + '</label>';
+
+          if (key === 'DEFAULT_STUDENT_STATUS') {
+            html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+            html += '<option value="aktif"' + (val === 'aktif' ? ' selected' : '') + '>aktif</option>';
+            html += '<option value="berhenti"' + (val === 'berhenti' ? ' selected' : '') + '>berhenti</option>';
+            html += '<option value="lulus"' + (val === 'lulus' ? ' selected' : '') + '>lulus</option>';
+            html += '</select>';
+          } else if (key === 'PARENT_CONTACT_MODE') {
+            html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+            html += '<option value="consolidated"' + (val === 'consolidated' ? ' selected' : '') + '>Consolidated</option>';
+            html += '<option value="separate"' + (val === 'separate' ? ' selected' : '') + '>Separate</option>';
+            html += '</select>';
+          } else if (key === 'WA_API_ENABLED' || key === 'DRY_RUN_DEFAULT' || key === 'DEBUG_MODE') {
+            html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+            html += '<option value="true"' + (val === 'true' ? ' selected' : '') + '>true</option>';
+            html += '<option value="false"' + (val === 'false' ? ' selected' : '') + '>false</option>';
+            html += '</select>';
+          } else if (key === 'WA_API_BASIC_AUTH_PASS') {
+            html += '<input type="password" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
+          } else {
+            html += '<input type="text" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
+          }
+
+          html += '</div>';
+        }
+
+        html += '</div>';
+      }
+
+      el.innerHTML = html;
+    }
+
+    function saveAllConfig() {
+      showLoading('config-alert', 'Saving config...');
+
+      var inputs = document.querySelectorAll('[data-config-key]');
+      var configObj = {};
+      for (var i = 0; i < inputs.length; i++) {
+        var key = inputs[i].getAttribute('data-config-key');
+        configObj[key] = inputs[i].value;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          var data = parseResult(result);
+          showAlert('config-alert', 'success', 'Config saved (' + (data.saved || 0) + ' keys)');
+        })
+        .withFailureHandler(function(err) {
+          showAlert('config-alert', 'error', 'Failed to save: ' + err.message);
+        })
+        .saveConfig(configObj);
+    }
+
+    function resetConfigDefaults() {
+      if (!confirm('Reset all config to defaults?')) return;
+      loadConfigTab();
+      showAlert('config-alert', 'info', 'Form reset to current values. Edit and save to apply defaults.');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadConfigTab();
+    });
+  </script>
+</body>
+</html>
