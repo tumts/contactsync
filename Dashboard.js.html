@@ -847,7 +847,7 @@ function renderConfigForm(config) {
   var groups = {
     'Source': ['SOURCE_SPREADSHEET_ID', 'SOURCE_SHEET'],
     'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
-    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL'],
+    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL', 'DEFAULT_STUDENT_STATUS'],
     'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
     'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_DEVICE_JID', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS', 'WA_API_JITTER_MS', 'WA_API_BATCH_SIZE', 'WA_API_BATCH_PAUSE_MS', 'WA_API_DAILY_LIMIT', 'WA_API_RECHECK_DAYS'],
     'Advanced': ['DEBUG_MODE']
@@ -867,7 +867,13 @@ function renderConfigForm(config) {
       html += '<div class="form-group">';
       html += '<label for="cfg-' + esc(key) + '">' + esc(key) + '</label>';
 
-      if (key === 'PARENT_CONTACT_MODE') {
+      if (key === 'DEFAULT_STUDENT_STATUS') {
+        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
+        html += '<option value="aktif"' + (val === 'aktif' ? ' selected' : '') + '>aktif</option>';
+        html += '<option value="berhenti"' + (val === 'berhenti' ? ' selected' : '') + '>berhenti</option>';
+        html += '<option value="lulus"' + (val === 'lulus' ? ' selected' : '') + '>lulus</option>';
+        html += '</select>';
+      } else if (key === 'PARENT_CONTACT_MODE') {
         html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
         html += '<option value="consolidated"' + (val === 'consolidated' ? ' selected' : '') + '>Consolidated</option>';
         html += '<option value="separate"' + (val === 'separate' ? ' selected' : '') + '>Separate</option>';

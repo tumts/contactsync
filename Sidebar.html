@@ -44,6 +44,12 @@
   </div>
 
   <script>
+    function esc(str) {
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(String(str || '')));
+      return div.innerHTML;
+    }
+
     function openFullDashboard() {
       google.script.run.openDashboard();
     }
@@ -73,7 +79,7 @@
     function sidebarAction(actionName) {
       var alertEl = document.getElementById('sidebar-alert');
       if (alertEl) {
-        alertEl.innerHTML = '<div class="alert alert-info" style="font-size:12px;">Running ' + actionName + '...</div>';
+        alertEl.innerHTML = '<div class="alert alert-info" style="font-size:12px;">Running ' + esc(actionName) + '...</div>';
       }
       var btns = document.querySelectorAll('.btn');
       for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
@@ -86,14 +92,14 @@
           }
           var msg = (data && data.message) ? data.message : actionName + ' completed';
           if (alertEl) {
-            alertEl.innerHTML = '<div class="alert alert-success" style="font-size:12px;">' + msg + '</div>';
+            alertEl.innerHTML = '<div class="alert alert-success" style="font-size:12px;">' + esc(msg) + '</div>';
           }
           for (var i = 0; i < btns.length; i++) btns[i].disabled = false;
           loadMiniOverview();
         })
         .withFailureHandler(function(err) {
           if (alertEl) {
-            alertEl.innerHTML = '<div class="alert alert-error" style="font-size:12px;">' + actionName + ' failed: ' + err.message + '</div>';
+            alertEl.innerHTML = '<div class="alert alert-error" style="font-size:12px;">' + esc(actionName) + ' failed: ' + esc(err.message) + '</div>';
           }
           for (var i = 0; i < btns.length; i++) btns[i].disabled = false;
         })[actionName]();
