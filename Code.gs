@@ -407,8 +407,8 @@ function updateContactStatus(contactId, newStatus) {
     syncStatus: 'pending'
   });
 
-  logAction(contactId, 'statusChange', 'success',
-    'Status changed to ' + newStatus + ' for ' + (contact.fullName || contactId), '');
+  logAction(contactId, 'statusChange', updated ? 'success' : 'error',
+    'Status ' + (updated ? 'changed' : 'failed to change') + ' to ' + newStatus + ' for ' + (contact.fullName || contactId), '');
 
   return JSON.stringify({ success: updated, contactId: contactId, newStatus: newStatus });
 }

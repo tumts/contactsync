@@ -364,6 +364,8 @@ function filterContacts() {
     var filterKeys = Object.keys(activeFilters);
     for (var f = 0; f < filterKeys.length; f++) {
       var fType = filterKeys[f];
+      // Skip _grade and _rombel — handled separately below
+      if (fType === '_grade' || fType === '_rombel') continue;
       var fVal = activeFilters[fType];
       if (fVal) {
         var contactVal = String(c[fType] || '').trim();
@@ -583,11 +585,13 @@ function saveContactStatus(contactId, index) {
         // Update local data
         if (filteredContactsData[index]) {
           filteredContactsData[index].studentStatus = newStatus;
+          filteredContactsData[index].syncStatus = 'pending';
         }
         // Also update in contactsData
         for (var i = 0; i < contactsData.length; i++) {
           if (String(contactsData[i].id) === String(contactId)) {
             contactsData[i].studentStatus = newStatus;
+            contactsData[i].syncStatus = 'pending';
             break;
           }
         }
