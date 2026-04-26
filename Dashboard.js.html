@@ -748,7 +748,7 @@ function loadLogs() {
 
   google.script.run
     .withSuccessHandler(function(result) {
-      logsData = result;
+      logsData = parseResult(result);
       if (!Array.isArray(logsData)) logsData = [];
       renderLogsTable(logsData);
     })
