@@ -68,6 +68,27 @@ function showAlert(containerId, type, message) {
   el.innerHTML = '<div class="alert alert-' + type + '">' + esc(message) + '</div>';
 }
 
+function showNotification(type, message, duration) {
+  duration = duration || 4000;
+  var container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2000;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(container);
+  }
+
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.innerHTML = '<span>' + esc(message) + '</span><button style="background:none;border:none;font-size:16px;cursor:pointer;margin-left:8px;color:inherit;" onclick="this.parentElement.remove()">&times;</button>';
+  container.appendChild(toast);
+
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    setTimeout(function() { if (toast.parentElement) toast.remove(); }, 300);
+  }, duration);
+}
+
 function showLoading(containerId, message) {
   var el = document.getElementById(containerId);
   if (!el) return;
@@ -478,6 +499,10 @@ function showContactDetail(index) {
   var c = filteredContactsData[index];
   if (!c) return;
 
+  // Store index for use by saveContactStatus
+  var contactIndex = index;
+  var contactId = c.id || '';
+
   var fields = [
     ['Full Name', c.fullName],
     ['Given Name', c.givenName],
@@ -513,10 +538,27 @@ function showContactDetail(index) {
   html += '<div class="modal-title">' + esc(c.fullName || '(no name)') + '</div>';
 
   for (var f = 0; f < fields.length; f++) {
+    var fieldName = fields[f][0];
     var val = String(fields[f][1] || '').trim();
+
+    // Special case: Student Status - editable dropdown
+    if (fieldName === 'Student Status') {
+      html += '<div class="modal-field">';
+      html += '<div class="modal-field-label">' + esc(fieldName) + '</div>';
+      html += '<div class="modal-field-value">';
+      html += '<select id="modal-status-select" class="form-control" style="display:inline-block;width:auto;">';
+      html += '<option value="aktif"' + (val === 'aktif' ? ' selected' : '') + '>Aktif</option>';
+      html += '<option value="berhenti"' + (val === 'berhenti' ? ' selected' : '') + '>Berhenti</option>';
+      html += '<option value="lulus"' + (val === 'lulus' ? ' selected' : '') + '>Lulus</option>';
+      html += '</select>';
+      html += ' <button class="btn btn-success" style="padding:4px 12px;font-size:12px;" onclick="saveContactStatus(\'' + esc(contactId) + '\',' + contactIndex + ')">Save</button>';
+      html += '</div></div>';
+      continue;
+    }
+
     if (!val) continue;
     html += '<div class="modal-field">';
-    html += '<div class="modal-field-label">' + esc(fields[f][0]) + '</div>';
+    html += '<div class="modal-field-label">' + esc(fieldName) + '</div>';
     html += '<div class="modal-field-value">' + esc(val) + '</div>';
     html += '</div>';
   }
@@ -525,6 +567,40 @@ function showContactDetail(index) {
 
   var modalEl = document.getElementById('contact-modal');
   if (modalEl) modalEl.innerHTML = html;
+}
+
+function saveContactStatus(contactId, index) {
+  var select = document.getElementById('modal-status-select');
+  if (!select) return;
+  var newStatus = select.value;
+
+  showNotification('info', 'Saving status...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var data = parseResult(result);
+      if (data.success) {
+        // Update local data
+        if (filteredContactsData[index]) {
+          filteredContactsData[index].studentStatus = newStatus;
+        }
+        // Also update in contactsData
+        for (var i = 0; i < contactsData.length; i++) {
+          if (String(contactsData[i].id) === String(contactId)) {
+            contactsData[i].studentStatus = newStatus;
+            break;
+          }
+        }
+        showNotification('success', 'Status updated to "' + newStatus + '"');
+        renderContactsTable();
+      } else {
+        showNotification('error', data.message || 'Failed to update status');
+      }
+    })
+    .withFailureHandler(function(err) {
+      showNotification('error', 'Error: ' + err.message);
+    })
+    .updateContactStatus(contactId, newStatus);
 }
 
 function closeContactModal(event) {
