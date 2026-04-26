@@ -508,24 +508,38 @@ function runPreviewSync() {
   showLoading('sync-alert', 'Running preview sync (dry-run)...');
   disableButtons(true);
   startSyncPolling();
+  var cancelBtn = document.getElementById('btn-cancel-sync');
+  if (cancelBtn) cancelBtn.style.display = 'inline-block';
 
   google.script.run
     .withSuccessHandler(function(result) {
       stopSyncPolling();
+      var cancelBtn = document.getElementById('btn-cancel-sync');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       var data = parseResult(result);
-      var msg = 'Preview: ' + (data.create || 0) + ' create, ' +
-        (data.update || 0) + ' update, ' +
-        (data.skip || 0) + ' skip, ' +
-        (data.error || 0) + ' error';
-      if (data.complete === false) {
-        msg += ' (incomplete — run again to continue)';
+      if (data.cancelled) {
+        var msg = 'Preview cancelled: ' + (data.create || 0) + ' create, ' +
+          (data.update || 0) + ' update, ' +
+          (data.skip || 0) + ' skip, ' +
+          (data.error || 0) + ' error (stopped at ' + (data.processed || 0) + '/' + (data.total || 0) + ')';
+        showAlert('sync-alert', 'warning', msg);
+      } else {
+        var msg = 'Preview: ' + (data.create || 0) + ' create, ' +
+          (data.update || 0) + ' update, ' +
+          (data.skip || 0) + ' skip, ' +
+          (data.error || 0) + ' error';
+        if (data.complete === false) {
+          msg += ' (incomplete — run again to continue)';
+        }
+        showAlert('sync-alert', 'info', msg);
       }
-      showAlert('sync-alert', 'info', msg);
       disableButtons(false);
       renderSyncProgress(data);
     })
     .withFailureHandler(function(err) {
       stopSyncPolling();
+      var cancelBtn = document.getElementById('btn-cancel-sync');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       showAlert('sync-alert', 'error', 'Preview failed: ' + err.message);
       disableButtons(false);
     })
@@ -536,27 +550,51 @@ function runExecuteSync() {
   showLoading('sync-alert', 'Executing sync to Google Contacts...');
   disableButtons(true);
   startSyncPolling();
+  var cancelBtn = document.getElementById('btn-cancel-sync');
+  if (cancelBtn) cancelBtn.style.display = 'inline-block';
 
   google.script.run
     .withSuccessHandler(function(result) {
       stopSyncPolling();
+      var cancelBtn = document.getElementById('btn-cancel-sync');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       var data = parseResult(result);
-      var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
-        (data.errors || 0) + ' errors, ' +
-        (data.skipped || 0) + ' skipped';
-      if (data.complete === false) {
-        msg += ' (incomplete — run again to continue)';
+      if (data.cancelled) {
+        var msg = 'Sync cancelled: ' + (data.synced || 0) + ' synced, ' +
+          (data.errors || 0) + ' errors (stopped at ' + (data.processed || 0) + '/' + (data.total || 0) + ')';
+        showAlert('sync-alert', 'warning', msg);
+      } else {
+        var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
+          (data.errors || 0) + ' errors, ' +
+          (data.skipped || 0) + ' skipped';
+        if (data.complete === false) {
+          msg += ' (incomplete — run again to continue)';
+        }
+        showAlert('sync-alert', data.errors > 0 ? 'warning' : 'success', msg);
       }
-      showAlert('sync-alert', data.errors > 0 ? 'warning' : 'success', msg);
       disableButtons(false);
       renderSyncProgress(data);
     })
     .withFailureHandler(function(err) {
       stopSyncPolling();
+      var cancelBtn = document.getElementById('btn-cancel-sync');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       showAlert('sync-alert', 'error', 'Sync failed: ' + err.message);
       disableButtons(false);
     })
     .runSync();
+}
+
+function cancelRunningSync() {
+  showLoading('sync-alert', 'Sending cancel signal...');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      showAlert('sync-alert', 'warning', 'Cancel signal sent. Waiting for sync to stop...');
+    })
+    .withFailureHandler(function(err) {
+      showAlert('sync-alert', 'error', 'Failed to cancel: ' + err.message);
+    })
+    .cancelSync();
 }
 
 /* === Sync Progress Polling === */

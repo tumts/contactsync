@@ -211,6 +211,24 @@ function previewSync() {
           error: errorCount
         });
       }
+
+      var cancelFlag = props.getProperty('SYNC_CANCEL');
+      if (cancelFlag === 'true') {
+        props.deleteProperty('SYNC_CANCEL');
+        props.deleteProperty('previewSync_progress');
+        SpreadsheetApp.flush();
+        logAction('system', 'preview', 'warning', 'Preview cancelled by user at index ' + i, '');
+        return JSON.stringify({
+          complete: false,
+          cancelled: true,
+          processed: i,
+          total: contacts.length,
+          create: createCount,
+          update: updateCount,
+          skip: skipCount,
+          error: errorCount
+        });
+      }
     }
 
     var c = contacts[i];
@@ -317,6 +335,24 @@ function runSync() {
         SpreadsheetApp.flush();
         return JSON.stringify({
           complete: false,
+          synced: syncedCount,
+          errors: errorCount,
+          skipped: skippedCount,
+          total: contacts.length,
+          processed: i
+        });
+      }
+
+      var cancelFlag = props.getProperty('SYNC_CANCEL');
+      if (cancelFlag === 'true') {
+        props.deleteProperty('SYNC_CANCEL');
+        props.deleteProperty('runSync_progress');
+        SpreadsheetApp.flush();
+        logAction('system', 'sync', 'warning', 'Sync cancelled by user at index ' + i,
+          JSON.stringify({ synced: syncedCount, errors: errorCount, skipped: skippedCount }));
+        return JSON.stringify({
+          complete: false,
+          cancelled: true,
           synced: syncedCount,
           errors: errorCount,
           skipped: skippedCount,

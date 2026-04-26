@@ -239,6 +239,21 @@ function batchCheckNumbers(phoneList) {
       });
     }
 
+    var cancelFlag = props.getProperty('SYNC_CANCEL');
+    if (cancelFlag === 'true') {
+      props.deleteProperty('SYNC_CANCEL');
+      props.deleteProperty('batchCheck_progress');
+      logAction('system', 'wa_check', 'warning', 'WA check cancelled by user at index ' + i, '');
+      return JSON.stringify({
+        complete: false,
+        cancelled: true,
+        checked: i,
+        total: phoneList.length,
+        results: results,
+        summary: summary
+      });
+    }
+
     // Batch pause every batchSize checks
     if (i > startIndex && (i - startIndex) % batchSize === 0) {
       Utilities.sleep(batchPause);
