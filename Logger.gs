@@ -43,10 +43,10 @@ function getRecentLogs(limit) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
 
-  if (!sheet) return [];
+  if (!sheet) return JSON.stringify([]);
 
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  var data = sheet.getDataRange().getDisplayValues();
+  if (data.length <= 1) return JSON.stringify([]);
 
   var headers = data[0];
   var logs = [];
@@ -55,12 +55,12 @@ function getRecentLogs(limit) {
   for (var r = data.length - 1; r >= startRow; r--) {
     var obj = {};
     for (var c = 0; c < headers.length; c++) {
-      obj[headers[c]] = data[r][c];
+      obj[String(headers[c])] = String(data[r][c] || '');
     }
     logs.push(obj);
   }
 
-  return logs;
+  return JSON.stringify(logs);
 }
 
 /**
