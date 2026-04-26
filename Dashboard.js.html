@@ -56,10 +56,8 @@ function switchTab(tabId) {
 
   if (tabId === 'overview') loadOverview();
   else if (tabId === 'contacts') loadContacts();
-  else if (tabId === 'sync') loadSyncTab();
   else if (tabId === 'wacheck') loadWaTab();
   else if (tabId === 'logs') loadLogs();
-  else if (tabId === 'config') loadConfigTab();
   else if (tabId === 'quality') loadQualityTab();
 }
 
@@ -134,26 +132,33 @@ function renderOverviewCards(data) {
   html += '</div>';
   html += '<p style="font-size:12px;color:#888;">Last sync: ' + esc(lastSync) + '</p>';
 
+  el.innerHTML = html;
+
+  // Render class breakdown in separate div (below sync buttons)
+  var breakdownEl = document.getElementById('overview-breakdown');
+  if (!breakdownEl) return;
+
   var breakdown = (data && data.classBreakdown) || [];
   if (breakdown.length > 0) {
-    html += '<div class="section-title">Ringkasan per Kelas</div>';
-    html += '<table class="mini-dashboard-table">';
-    html += '<thead><tr><th>Kelas</th><th>Total</th><th>Synced</th><th>Pending</th><th>Errors</th></tr></thead>';
-    html += '<tbody>';
+    var bhtml = '<div class="section-title">Ringkasan per Kelas</div>';
+    bhtml += '<table class="mini-dashboard-table">';
+    bhtml += '<thead><tr><th>Kelas</th><th>Total</th><th>Synced</th><th>Pending</th><th>Errors</th></tr></thead>';
+    bhtml += '<tbody>';
     for (var b = 0; b < breakdown.length; b++) {
       var cls = breakdown[b];
-      html += '<tr>';
-      html += '<td>' + esc(cls.classLabel) + '</td>';
-      html += '<td>' + esc(String(cls.total)) + '</td>';
-      html += '<td>' + esc(String(cls.synced)) + '</td>';
-      html += '<td>' + esc(String(cls.pending)) + '</td>';
-      html += '<td>' + esc(String(cls.errors)) + '</td>';
-      html += '</tr>';
+      bhtml += '<tr>';
+      bhtml += '<td>' + esc(cls.classLabel) + '</td>';
+      bhtml += '<td>' + esc(String(cls.total)) + '</td>';
+      bhtml += '<td>' + esc(String(cls.synced)) + '</td>';
+      bhtml += '<td>' + esc(String(cls.pending)) + '</td>';
+      bhtml += '<td>' + esc(String(cls.errors)) + '</td>';
+      bhtml += '</tr>';
     }
-    html += '</tbody></table>';
+    bhtml += '</tbody></table>';
+    breakdownEl.innerHTML = bhtml;
+  } else {
+    breakdownEl.innerHTML = '';
   }
-
-  el.innerHTML = html;
 }
 
 function buildCard(value, label) {
@@ -485,48 +490,8 @@ function closeContactModal(event) {
   }
 }
 
-/* ============================================
-   TAB 3: SYNC
-   ============================================ */
-function loadSyncTab() {
-  google.script.run
-    .withSuccessHandler(function(result) {
-      var data = parseResult(result);
-      renderNamingPreview(data);
-    })
-    .withFailureHandler(function() {})
-    .previewNaming(1);
-}
-
-function renderNamingPreview(data) {
-  var el = document.getElementById('naming-preview-area');
-  if (!el || !data || !data.presets) return;
-
-  var html = '<div class="naming-preview">';
-  for (var i = 0; i < data.presets.length; i++) {
-    var p = data.presets[i];
-    var cls = p.selected ? 'preset-item preset-selected' : 'preset-item';
-    html += '<div class="' + cls + '">';
-    html += '<strong>Preset ' + esc(String(p.id)) + ':</strong> ' + esc(p.example);
-    html += '</div>';
-  }
-  html += '</div>';
-  el.innerHTML = html;
-}
-
-function updateNamingPreview() {
-  var presetSelect = document.getElementById('sync-preset');
-  var presetId = presetSelect ? presetSelect.value : '1';
-  google.script.run
-    .withSuccessHandler(function(result) {
-      renderNamingPreview(parseResult(result));
-    })
-    .withFailureHandler(function() {})
-    .previewNaming(Number(presetId));
-}
-
 function runPreviewSync() {
-  showLoading('sync-alert', 'Running preview sync (dry-run)...');
+  showLoading('overview-alert', 'Running preview sync (dry-run)...');
   disableButtons(true);
   startSyncPolling();
   var cancelBtn = document.getElementById('btn-cancel-sync');
@@ -543,7 +508,7 @@ function runPreviewSync() {
           (data.update || 0) + ' update, ' +
           (data.skip || 0) + ' skip, ' +
           (data.error || 0) + ' error (stopped at ' + (data.processed || 0) + '/' + (data.total || 0) + ')';
-        showAlert('sync-alert', 'warning', msg);
+        showAlert('overview-alert', 'warning', msg);
       } else {
         var msg = 'Preview: ' + (data.create || 0) + ' create, ' +
           (data.update || 0) + ' update, ' +
@@ -552,7 +517,7 @@ function runPreviewSync() {
         if (data.complete === false) {
           msg += ' (incomplete — run again to continue)';
         }
-        showAlert('sync-alert', 'info', msg);
+        showAlert('overview-alert', 'info', msg);
       }
       disableButtons(false);
       renderSyncProgress(data);
@@ -561,14 +526,14 @@ function runPreviewSync() {
       stopSyncPolling();
       var cancelBtn = document.getElementById('btn-cancel-sync');
       if (cancelBtn) cancelBtn.style.display = 'none';
-      showAlert('sync-alert', 'error', 'Preview failed: ' + err.message);
+      showAlert('overview-alert', 'error', 'Preview failed: ' + err.message);
       disableButtons(false);
     })
     .previewSync();
 }
 
 function runExecuteSync() {
-  showLoading('sync-alert', 'Executing sync to Google Contacts...');
+  showLoading('overview-alert', 'Executing sync to Google Contacts...');
   disableButtons(true);
   startSyncPolling();
   var cancelBtn = document.getElementById('btn-cancel-sync');
@@ -583,10 +548,10 @@ function runExecuteSync() {
       if (data.cancelled) {
         var msg = 'Sync cancelled: ' + (data.synced || 0) + ' synced, ' +
           (data.errors || 0) + ' errors (stopped at ' + (data.processed || 0) + '/' + (data.total || 0) + ')';
-        showAlert('sync-alert', 'warning', msg);
+        showAlert('overview-alert', 'warning', msg);
       } else if (data.stoppedOnError) {
         var msg = 'Sync stopped: ' + (data.errors || 0) + ' errors, ' + (data.synced || 0) + ' synced. Fix issues then run again.';
-        showAlert('sync-alert', 'error', msg);
+        showAlert('overview-alert', 'error', msg);
       } else {
         var msg = 'Sync: ' + (data.synced || 0) + ' synced, ' +
           (data.errors || 0) + ' errors, ' +
@@ -594,7 +559,7 @@ function runExecuteSync() {
         if (data.complete === false) {
           msg += ' (incomplete — run again to continue)';
         }
-        showAlert('sync-alert', data.errors > 0 ? 'warning' : 'success', msg);
+        showAlert('overview-alert', data.errors > 0 ? 'warning' : 'success', msg);
       }
       disableButtons(false);
       renderSyncProgress(data);
@@ -603,20 +568,20 @@ function runExecuteSync() {
       stopSyncPolling();
       var cancelBtn = document.getElementById('btn-cancel-sync');
       if (cancelBtn) cancelBtn.style.display = 'none';
-      showAlert('sync-alert', 'error', 'Sync failed: ' + err.message);
+      showAlert('overview-alert', 'error', 'Sync failed: ' + err.message);
       disableButtons(false);
     })
     .runSync();
 }
 
 function cancelRunningSync() {
-  showLoading('sync-alert', 'Sending cancel signal...');
+  showLoading('overview-alert', 'Sending cancel signal...');
   google.script.run
     .withSuccessHandler(function(result) {
-      showAlert('sync-alert', 'warning', 'Cancel signal sent. Waiting for sync to stop...');
+      showAlert('overview-alert', 'warning', 'Cancel signal sent. Waiting for sync to stop...');
     })
     .withFailureHandler(function(err) {
-      showAlert('sync-alert', 'error', 'Failed to cancel: ' + err.message);
+      showAlert('overview-alert', 'error', 'Failed to cancel: ' + err.message);
     })
     .cancelSync();
 }
@@ -626,7 +591,7 @@ function runTestSync() {
   if (countStr === null) return;
   var count = parseInt(countStr) || 2;
 
-  showLoading('sync-alert', 'Testing sync with ' + count + ' contacts...');
+  showLoading('overview-alert', 'Testing sync with ' + count + ' contacts...');
   disableButtons(true);
 
   google.script.run
@@ -640,11 +605,11 @@ function runTestSync() {
           if (res.error) msg += ' (' + res.error.substring(0, 100) + ')';
         }
       }
-      showAlert('sync-alert', data.errors > 0 ? 'error' : 'success', msg);
+      showAlert('overview-alert', data.errors > 0 ? 'error' : 'success', msg);
       disableButtons(false);
     })
     .withFailureHandler(function(err) {
-      showAlert('sync-alert', 'error', 'Test sync failed: ' + err.message);
+      showAlert('overview-alert', 'error', 'Test sync failed: ' + err.message);
       disableButtons(false);
     })
     .testSync(count);
@@ -652,16 +617,16 @@ function runTestSync() {
 
 function clearErrorsAndResetUI() {
   if (!confirm('Hapus semua error logs dan reset kontak error ke pending?')) return;
-  showLoading('sync-alert', 'Clearing errors...');
+  showLoading('overview-alert', 'Clearing errors...');
 
   google.script.run
     .withSuccessHandler(function(result) {
       var data = parseResult(result);
-      showAlert('sync-alert', 'success', data.message || 'Errors cleared');
+      showAlert('overview-alert', 'success', data.message || 'Errors cleared');
       if (currentTab === 'overview') loadOverview();
     })
     .withFailureHandler(function(err) {
-      showAlert('sync-alert', 'error', 'Failed: ' + err.message);
+      showAlert('overview-alert', 'error', 'Failed: ' + err.message);
     })
     .clearErrorsAndReset();
 }
@@ -709,27 +674,6 @@ function renderSyncProgress(data) {
   '<p style="font-size:12px;color:#666;text-align:center;">' + pct + '% (' + processed + '/' + total + ')</p>';
 
   el.innerHTML = html;
-}
-
-function saveSyncConfig() {
-  var classLabel = document.getElementById('sync-class-label');
-  var yearLabel = document.getElementById('sync-year-label');
-  var presetSelect = document.getElementById('sync-preset');
-  var parentMode = document.querySelector('input[name="parent-mode"]:checked');
-  var studentStatus = document.getElementById('sync-student-status');
-
-  var updates = {};
-  if (classLabel) updates.DEFAULT_CLASS_LABEL = classLabel.value;
-  if (yearLabel) updates.DEFAULT_YEAR_LABEL = yearLabel.value;
-  if (presetSelect) updates.NAMING_PRESET = presetSelect.value;
-  if (parentMode) updates.PARENT_CONTACT_MODE = parentMode.value;
-  if (studentStatus) updates.DEFAULT_STUDENT_STATUS = studentStatus.value;
-
-  var keys = Object.keys(updates);
-  for (var i = 0; i < keys.length; i++) {
-    google.script.run.setConfigValue(keys[i], updates[keys[i]]);
-  }
-  showAlert('sync-alert', 'success', 'Sync settings saved');
 }
 
 /* ============================================
@@ -928,108 +872,6 @@ function clearAllLogs() {
       showAlert('logs-alert', 'error', 'Failed to clear logs: ' + err.message);
     })
     .clearLogs();
-}
-
-/* ============================================
-   TAB 6: CONFIG
-   ============================================ */
-function loadConfigTab() {
-  showLoading('config-form-area', 'Loading config...');
-
-  google.script.run
-    .withSuccessHandler(function(result) {
-      var config = parseResult(result);
-      renderConfigForm(config);
-    })
-    .withFailureHandler(function(err) {
-      showAlert('config-alert', 'error', 'Failed to load config: ' + err.message);
-    })
-    .loadConfig();
-}
-
-function renderConfigForm(config) {
-  var el = document.getElementById('config-form-area');
-  if (!el) return;
-
-  var groups = {
-    'Source': ['SOURCE_SPREADSHEET_ID', 'SOURCE_SHEET'],
-    'General': ['CONTACTS_SHEET', 'SYNCLOG_SHEET', 'DUPLICATES_SHEET', 'CONFIG_SHEET', 'DEFAULT_ORGANIZATION', 'DEFAULT_GROUP_NAME'],
-    'Naming': ['NAMING_PRESET', 'DEFAULT_CLASS_LABEL', 'DEFAULT_YEAR_LABEL', 'DEFAULT_STUDENT_STATUS'],
-    'Parent Mode': ['PARENT_CONTACT_MODE', 'DRY_RUN_DEFAULT'],
-    'WA API': ['WA_API_ENABLED', 'WA_API_BASE_URL', 'WA_API_DEVICE_JID', 'WA_API_TIMEOUT_MS', 'WA_API_BASIC_AUTH_USER', 'WA_API_BASIC_AUTH_PASS', 'WA_API_BATCH_DELAY_MS', 'WA_API_JITTER_MS', 'WA_API_BATCH_SIZE', 'WA_API_BATCH_PAUSE_MS', 'WA_API_DAILY_LIMIT', 'WA_API_RECHECK_DAYS'],
-    'Advanced': ['DEBUG_MODE']
-  };
-
-  var html = '';
-  var groupNames = Object.keys(groups);
-  for (var g = 0; g < groupNames.length; g++) {
-    var groupName = groupNames[g];
-    var keys = groups[groupName];
-    html += '<div class="config-group">';
-    html += '<div class="config-group-title">' + esc(groupName) + '</div>';
-
-    for (var k = 0; k < keys.length; k++) {
-      var key = keys[k];
-      var val = config[key] !== undefined ? String(config[key]) : '';
-      html += '<div class="form-group">';
-      html += '<label for="cfg-' + esc(key) + '">' + esc(key) + '</label>';
-
-      if (key === 'DEFAULT_STUDENT_STATUS') {
-        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
-        html += '<option value="aktif"' + (val === 'aktif' ? ' selected' : '') + '>aktif</option>';
-        html += '<option value="berhenti"' + (val === 'berhenti' ? ' selected' : '') + '>berhenti</option>';
-        html += '<option value="lulus"' + (val === 'lulus' ? ' selected' : '') + '>lulus</option>';
-        html += '</select>';
-      } else if (key === 'PARENT_CONTACT_MODE') {
-        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
-        html += '<option value="consolidated"' + (val === 'consolidated' ? ' selected' : '') + '>Consolidated</option>';
-        html += '<option value="separate"' + (val === 'separate' ? ' selected' : '') + '>Separate</option>';
-        html += '</select>';
-      } else if (key === 'WA_API_ENABLED' || key === 'DRY_RUN_DEFAULT' || key === 'DEBUG_MODE') {
-        html += '<select id="cfg-' + esc(key) + '" class="form-control" data-config-key="' + esc(key) + '">';
-        html += '<option value="true"' + (val === 'true' ? ' selected' : '') + '>true</option>';
-        html += '<option value="false"' + (val === 'false' ? ' selected' : '') + '>false</option>';
-        html += '</select>';
-      } else if (key === 'WA_API_BASIC_AUTH_PASS') {
-        html += '<input type="password" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
-      } else {
-        html += '<input type="text" id="cfg-' + esc(key) + '" class="form-control" value="' + esc(val) + '" data-config-key="' + esc(key) + '" />';
-      }
-
-      html += '</div>';
-    }
-
-    html += '</div>';
-  }
-
-  el.innerHTML = html;
-}
-
-function saveAllConfig() {
-  showLoading('config-alert', 'Saving config...');
-
-  var inputs = document.querySelectorAll('[data-config-key]');
-  var configObj = {};
-  for (var i = 0; i < inputs.length; i++) {
-    var key = inputs[i].getAttribute('data-config-key');
-    configObj[key] = inputs[i].value;
-  }
-
-  google.script.run
-    .withSuccessHandler(function(result) {
-      var data = parseResult(result);
-      showAlert('config-alert', 'success', 'Config saved (' + (data.saved || 0) + ' keys)');
-    })
-    .withFailureHandler(function(err) {
-      showAlert('config-alert', 'error', 'Failed to save: ' + err.message);
-    })
-    .saveConfig(configObj);
-}
-
-function resetConfigDefaults() {
-  if (!confirm('Reset all config to defaults?')) return;
-  loadConfigTab();
-  showAlert('config-alert', 'info', 'Form reset to current values. Edit and save to apply defaults.');
 }
 
 /* ============================================
