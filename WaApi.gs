@@ -160,7 +160,7 @@ function getTodayCheckCount() {
   var config = loadConfig();
   var logSheet = config.SYNCLOG_SHEET || 'SyncLog';
   var logs = readSheetAsObjects(logSheet);
-  var today = new Date().toISOString().split('T')[0];
+  var today = formatTimestamp(new Date()).split(' ')[0];
   var count = 0;
   for (var i = 0; i < logs.length; i++) {
     if (String(logs[i].action || '') === 'wa_check' &&
@@ -186,7 +186,7 @@ function wasRecentlyChecked(phone) {
 
   for (var i = logs.length - 1; i >= 0; i--) {
     if (String(logs[i].action || '') === 'wa_check' &&
-        String(logs[i].row_id || '') === phone) {
+        String(logs[i].rowId || '') === phone) {
       var logDate = new Date(logs[i].timestamp);
       if (logDate >= cutoff) return true;
     }
@@ -220,6 +220,7 @@ function batchCheckNumbers(phoneList) {
   var results = [];
   var summary = { active: 0, inactive: 0, invalid: 0, error: 0 };
   var consecutiveErrors = 0;
+  var aborted = false;
 
   for (var i = startIndex; i < phoneList.length; i++) {
     // GAS 4.5-minute timeout guard
@@ -267,6 +268,7 @@ function batchCheckNumbers(phoneList) {
       summary.error++;
       if (consecutiveErrors >= 5) {
         logAction(item.phone, 'wa_check', 'abort', 'Too many consecutive errors');
+        aborted = true;
         break;
       }
     } else {
@@ -280,11 +282,20 @@ function batchCheckNumbers(phoneList) {
     logAction(item.phone, 'wa_check', checkResult.status, checkResult.message || '');
   }
 
-  props.deleteProperty('batchCheck_progress');
+  var actualChecked = results.length;
+
+  if (aborted) {
+    props.setProperty('batchCheck_progress', JSON.stringify({
+      lastIndex: startIndex + actualChecked,
+      summary: summary
+    }));
+  } else {
+    props.deleteProperty('batchCheck_progress');
+  }
 
   return JSON.stringify({
-    complete: true,
-    checked: phoneList.length,
+    complete: !aborted,
+    checked: actualChecked,
     total: phoneList.length,
     results: results,
     summary: summary
