@@ -92,25 +92,30 @@ function testWaConnection() {
 }
 
 /**
- * Test WA number check with 1-2 numbers from contacts.
- * @param {number} count Number of contacts to test (default 1).
- * @return {string} JSON result with detailed check results.
+ * Test WA check with a small number of contacts.
+ * Checks the first N contacts that haven't been checked yet.
+ * Also fetches user info (pushName) for active numbers.
+ * @param {number} count Number of contacts to test (default 2).
+ * @return {string} JSON result with per-contact details.
  */
 function testWaCheck(count) {
-  count = count || 1;
+  count = count || 2;
   var config = loadConfig();
 
   if (config.WA_API_ENABLED !== 'true') {
-    return JSON.stringify({ success: false, message: 'WA API is disabled. Enable it in Config first.' });
+    return JSON.stringify({
+      success: false,
+      message: 'WA API is disabled. Enable it in Config first.'
+    });
   }
 
   var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
-  var testNumbers = [];
+  var testContacts = [];
 
-  for (var i = 0; i < contacts.length && testNumbers.length < count; i++) {
+  for (var i = 0; i < contacts.length && testContacts.length < count; i++) {
     var phone = String(contacts[i].phonePrimary || '').trim();
     if (phone) {
-      testNumbers.push({
+      testContacts.push({
         id: contacts[i].id,
         name: contacts[i].fullName || '(no name)',
         phone: phone
@@ -118,24 +123,26 @@ function testWaCheck(count) {
     }
   }
 
-  if (testNumbers.length === 0) {
+  if (testContacts.length === 0) {
     return JSON.stringify({ success: false, message: 'No contacts with phone numbers found.' });
   }
 
   var results = [];
-  for (var t = 0; t < testNumbers.length; t++) {
-    var item = testNumbers[t];
+  for (var t = 0; t < testContacts.length; t++) {
+    var item = testContacts[t];
     var checkResult = checkWhatsAppNumber(item.phone);
 
-    // Also try to get user info if available
     var userInfo = null;
-    try {
-      userInfo = getWaUserInfo(item.phone);
-    } catch (e) {
-      // user info is optional
+    if (checkResult.status === 'active') {
+      try {
+        userInfo = getWaUserInfo(item.phone);
+      } catch (e) {
+        // User info is optional
+      }
     }
 
     results.push({
+      id: item.id,
       name: item.name,
       phone: item.phone,
       status: checkResult.status,
@@ -159,7 +166,7 @@ function testWaCheck(count) {
       'Test WA check: ' + item.name + ' (' + item.phone + ') = ' + checkResult.status,
       JSON.stringify(checkResult));
 
-    if (t < testNumbers.length - 1) {
+    if (t < testContacts.length - 1) {
       Utilities.sleep(2000);
     }
   }
@@ -587,6 +594,150 @@ function checkAllContactNumbers() {
     success: true,
     complete: result.complete,
     total: allPhones.length,
+    checked: checked,
+    skipped: skipped,
+    remainingToday: remaining - checked,
+    summary: result.summary
+  });
+}
+
+/**
+ * Check WA numbers filtered by grade and/or rombel.
+ * Uses the same grade/rombel parsing as the Contacts filter pills.
+ * @param {string} gradeFilter Grade filter (e.g., '7', '8', '9') or empty for all.
+ * @param {string} rombelFilter Rombel filter (e.g., 'A', 'B', 'C') or empty for all.
+ * @return {string} JSON result.
+ */
+function checkNumbersByClass(gradeFilter, rombelFilter) {
+  var config = loadConfig();
+  var dailyLimit = parseInt(config.WA_API_DAILY_LIMIT) || 100;
+
+  if (config.WA_API_ENABLED !== 'true') {
+    return JSON.stringify({
+      success: false,
+      message: 'WA API is disabled. Enable it in Config first.'
+    });
+  }
+
+  var todayCount = getTodayCheckCount();
+  if (todayCount >= dailyLimit) {
+    return JSON.stringify({
+      success: false,
+      message: 'Batas harian tercapai (' + dailyLimit + ' cek/hari). Coba lagi besok.'
+    });
+  }
+
+  var remaining = dailyLimit - todayCount;
+  var contacts = readSheetAsObjects(config.CONTACTS_SHEET || 'Contacts');
+
+  // Filter contacts by grade and/or rombel
+  var filtered = [];
+  for (var i = 0; i < contacts.length; i++) {
+    var cl = String(contacts[i].classLabel || '').trim();
+    if (!cl) continue;
+
+    // Parse classLabel into grade and rombel (same logic as Dashboard.js.html)
+    var grade = cl.replace(/[A-Za-z]+$/, '').trim();
+    var rombel = cl.replace(/^[0-9]+/, '').trim();
+
+    var matchGrade = !gradeFilter || grade === gradeFilter;
+    var matchRombel = !rombelFilter || rombel === rombelFilter;
+
+    if (matchGrade && matchRombel) {
+      filtered.push(contacts[i]);
+    }
+  }
+
+  if (filtered.length === 0) {
+    var filterDesc = '';
+    if (gradeFilter) filterDesc += 'Kelas ' + gradeFilter;
+    if (rombelFilter) filterDesc += (filterDesc ? ' ' : '') + 'Rombel ' + rombelFilter;
+    return JSON.stringify({
+      success: true,
+      message: 'Tidak ada kontak untuk filter: ' + (filterDesc || '(kosong)'),
+      summary: {},
+      checked: 0
+    });
+  }
+
+  // Collect unique phone numbers from filtered contacts
+  var allPhones = [];
+  var seen = {};
+  for (var j = 0; j < filtered.length; j++) {
+    var phones = [
+      { field: 'phonePrimary', value: filtered[j].phonePrimary },
+      { field: 'phoneSecondary', value: filtered[j].phoneSecondary },
+      { field: 'parentPhone', value: filtered[j].parentPhone }
+    ];
+    for (var p = 0; p < phones.length; p++) {
+      var num = String(phones[p].value || '').trim();
+      if (num && !seen[num]) {
+        seen[num] = true;
+        allPhones.push({ rowId: filtered[j].id, phone: num });
+      }
+    }
+  }
+
+  // Filter out recently checked numbers
+  var phoneList = [];
+  var skipped = 0;
+  for (var k = 0; k < allPhones.length && phoneList.length < remaining; k++) {
+    var normalized = normalizePhoneNumber(allPhones[k].phone);
+    if (normalized && !wasRecentlyChecked(normalized)) {
+      phoneList.push(allPhones[k]);
+    } else if (normalized) {
+      skipped++;
+    }
+  }
+
+  if (phoneList.length === 0) {
+    return JSON.stringify({
+      success: true,
+      message: 'Semua nomor sudah dicek baru-baru ini (skipped ' + skipped + ')',
+      summary: {},
+      skipped: skipped,
+      remainingToday: remaining
+    });
+  }
+
+  var result = JSON.parse(batchCheckNumbers(phoneList));
+
+  // Update Contacts sheet with WA status
+  if (result.results) {
+    var contactsSheet = config.CONTACTS_SHEET || 'Contacts';
+    var now = formatTimestamp(new Date());
+    var phoneStatusMap = {};
+    for (var r = 0; r < result.results.length; r++) {
+      phoneStatusMap[result.results[r].phone] = result.results[r].status;
+    }
+
+    for (var c = 0; c < filtered.length; c++) {
+      var primary = String(filtered[c].phonePrimary || '').trim();
+      if (primary && phoneStatusMap[primary]) {
+        updateRowByKey(contactsSheet, 'id', filtered[c].id, {
+          waPhoneStatus: phoneStatusMap[primary],
+          waPhoneCheckedAt: now
+        });
+      }
+    }
+  }
+
+  var filterLabel = '';
+  if (gradeFilter) filterLabel += 'Kelas ' + gradeFilter;
+  if (rombelFilter) filterLabel += (filterLabel ? ' ' : '') + rombelFilter;
+
+  var checked = result.checked || 0;
+  logAction('system', 'waCheckByClass', result.complete ? 'success' : 'partial',
+    'WA check [' + filterLabel + ']: ' + (result.summary.active || 0) + ' active, ' +
+    (result.summary.inactive || 0) + ' inactive (' + filtered.length + ' contacts)',
+    JSON.stringify({ filter: filterLabel, summary: result.summary }));
+
+  return JSON.stringify({
+    success: true,
+    complete: result.complete,
+    filterLabel: filterLabel,
+    totalContacts: filtered.length,
+    totalPhones: allPhones.length,
     checked: checked,
     skipped: skipped,
     remainingToday: remaining - checked,
