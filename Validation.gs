@@ -229,7 +229,7 @@ function checkConfigCompleteness() {
   for (var i = 0; i < requiredKeys.length; i++) {
     var key = requiredKeys[i];
     if (config[key] === undefined || config[key] === '') {
-      if (key !== 'DEFAULT_CLASS_LABEL' && key !== 'WA_API_BASIC_AUTH_USER' && key !== 'WA_API_BASIC_AUTH_PASS') {
+      if (key !== 'WA_API_BASIC_AUTH_USER' && key !== 'WA_API_BASIC_AUTH_PASS') {
         missing.push(key);
       }
     }
