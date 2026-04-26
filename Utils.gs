@@ -67,14 +67,25 @@ function mapSourceColumns(row, headerMap) {
   var rombel = String(row['rombel'] || '').trim();
   var classLabel = kelas + rombel;
 
+  var studentStatus = String(row['status'] || '').trim().toLowerCase() || 'aktif';
+  var birthday = String(row['tanggal_lahir'] || '').trim();
+
   var contact = {
     fullName: fullName,
     givenName: nameParts.givenName,
     familyName: nameParts.familyName,
+    middleName: '',
+    namePrefix: '',
+    nameSuffix: '',
+    nickname: '',
+    fileAs: '',
     classLabel: classLabel,
     phonePrimary: normalizePhoneNumber(row['wa_siswa']),
     emailPrimary: cleanEmail(row['email_siswa']),
     nisn: String(row['nisn'] || '').trim(),
+    studentStatus: studentStatus,
+    birthday: birthday,
+    phoneLabel: '',
     parentName: '',
     parentPhone: '',
     parentEmail: '',
@@ -97,6 +108,21 @@ function mapSourceColumns(row, headerMap) {
   }
 
   return contact;
+}
+
+/**
+ * Build a labels string from classLabel, yearLabel, and studentStatus.
+ * @param {string} classLabel Class label.
+ * @param {string} yearLabel Year label.
+ * @param {string} studentStatus Student status.
+ * @return {string} Labels string separated by ' ::: '.
+ */
+function buildLabels(classLabel, yearLabel, studentStatus) {
+  var parts = [];
+  if (classLabel) parts.push('Kelas ' + String(classLabel).trim());
+  if (yearLabel) parts.push('TA ' + String(yearLabel).trim());
+  if (studentStatus) parts.push(String(studentStatus).trim());
+  return parts.join(' ::: ');
 }
 
 /**

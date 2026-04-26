@@ -12,7 +12,7 @@
 
   /* === Layout === */
   .app-container {
-    max-width: 1100px;
+    max-width: 100%;
     margin: 0 auto;
     padding: 16px;
   }
@@ -446,5 +446,190 @@
   .pagination .page-info {
     font-size: 12px;
     color: #666;
+  }
+
+  /* === Skeleton Loading === */
+  .skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 4px;
+    min-height: 20px;
+  }
+
+  @keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .skeleton-card {
+    height: 80px;
+    border-radius: 8px;
+  }
+
+  .skeleton-row {
+    height: 16px;
+    margin-bottom: 8px;
+  }
+
+  /* === Filter Pills === */
+  .filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+  }
+
+  .filter-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid #dadce0;
+    background: #fff;
+    color: #555;
+    transition: all 0.2s;
+  }
+
+  .filter-pill:hover {
+    border-color: #1a73e8;
+    color: #1a73e8;
+  }
+
+  .filter-pill.active {
+    background: #1a73e8;
+    color: #fff;
+    border-color: #1a73e8;
+  }
+
+  /* === Search Bar === */
+  .contacts-search-bar {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+
+  .contacts-search-bar:focus {
+    outline: none;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+  }
+
+  /* === Modal Overlay === */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    position: relative;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+  }
+
+  .modal-close:hover {
+    color: #333;
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-right: 30px;
+  }
+
+  .modal-field {
+    display: flex;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+
+  .modal-field-label {
+    width: 140px;
+    flex-shrink: 0;
+    font-weight: 600;
+    color: #555;
+  }
+
+  .modal-field-value {
+    flex: 1;
+    color: #333;
+    word-break: break-all;
+  }
+
+  /* === Mini Dashboard Table === */
+  .mini-dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  .mini-dashboard-table th {
+    background: #f0f4ff;
+    padding: 6px 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  .mini-dashboard-table td {
+    padding: 6px 10px;
+    text-align: center;
+  }
+
+  .mini-dashboard-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+  }
+
+  /* === Quality Tab === */
+  .quality-filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+  }
+
+  /* === Clickable Row === */
+  tr.clickable-row {
+    cursor: pointer;
+  }
+
+  tr.clickable-row:hover {
+    background: #e8f0fe;
   }
 </style>

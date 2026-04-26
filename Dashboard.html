@@ -23,6 +23,7 @@
       <button class="tab-btn" data-tab="wacheck" onclick="switchTab('wacheck')">WA Check</button>
       <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Logs</button>
       <button class="tab-btn" data-tab="config" onclick="switchTab('config')">Config</button>
+      <button class="tab-btn" data-tab="quality" onclick="switchTab('quality')">Data Quality</button>
     </div>
 
     <!-- TAB 1: Overview -->
@@ -42,6 +43,8 @@
     <!-- TAB 2: Contacts -->
     <div id="tab-contacts" class="tab-content">
       <div id="contacts-alert"></div>
+      <input type="text" id="contacts-search" class="contacts-search-bar" placeholder="Cari nama, phone, email..." onkeyup="filterContacts()">
+      <div id="contacts-filter-pills" class="filter-pills"></div>
       <div class="btn-group">
         <button class="btn btn-secondary" onclick="loadContacts()">Refresh Table</button>
       </div>
@@ -67,11 +70,18 @@
       <div class="form-group">
         <label for="sync-preset">Naming Preset</label>
         <select id="sync-preset" class="form-control" onchange="updateNamingPreview()">
-          <option value="1">Preset 1: Name - Class - Year</option>
-          <option value="2">Preset 2: Name / Class / Year</option>
-          <option value="3">Preset 3: Name (Class Year)</option>
-          <option value="4">Preset 4: Name - Org Class</option>
-          <option value="5">Preset 5: Name [Class] Year</option>
+          <option value="1">Preset 1: First Last</option>
+          <option value="2">Preset 2: Last, First</option>
+          <option value="3">Preset 3: Full Name</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="sync-student-status">Default Student Status</label>
+        <select id="sync-student-status" class="form-control">
+          <option value="aktif">Aktif</option>
+          <option value="berhenti">Berhenti</option>
+          <option value="lulus">Lulus</option>
         </select>
       </div>
 
@@ -164,6 +174,33 @@
         <button class="btn btn-secondary" onclick="resetConfigDefaults()">Reset to Defaults</button>
       </div>
     </div>
+
+    <!-- TAB 7: Data Quality -->
+    <div id="tab-quality" class="tab-content">
+      <div id="quality-alert"></div>
+
+      <div class="section-title">Data Quality Report</div>
+
+      <div id="quality-filter-pills" class="filter-pills">
+        <span class="filter-pill" onclick="filterInvalidByType('')">All</span>
+        <span class="filter-pill" onclick="filterInvalidByType('fullName is required')">Nama Kosong</span>
+        <span class="filter-pill" onclick="filterInvalidByType('phonePrimary')">Phone Invalid</span>
+        <span class="filter-pill" onclick="filterInvalidByType('emailPrimary')">Email Invalid</span>
+        <span class="filter-pill" onclick="filterInvalidByType('classLabel is empty')">Kelas Kosong</span>
+        <span class="filter-pill" onclick="filterInvalidByType('yearLabel is empty')">Year Kosong</span>
+        <span class="filter-pill" onclick="filterInvalidByType('studentStatus')">Status Invalid</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="loadQualityTab()">Refresh</button>
+        <button class="btn btn-success" onclick="exportInvalidCSV()">Export CSV for SiswaHub</button>
+      </div>
+
+      <div id="quality-table-wrap"></div>
+    </div>
+
+    <!-- Contact Detail Modal -->
+    <div id="contact-modal"></div>
 
   </div>
 

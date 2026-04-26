@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <?!= include('Dashboard.css'); ?>
+  <style>
+    .sidebar-container { padding: 12px; }
+    .sidebar-header { text-align: center; margin-bottom: 16px; }
+    .sidebar-header h2 { font-size: 16px; color: #1a73e8; margin-bottom: 4px; }
+    .sidebar-header p { font-size: 11px; color: #888; }
+    .mini-overview { margin-bottom: 16px; }
+    .mini-stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+    .mini-stat-label { color: #555; }
+    .mini-stat-value { font-weight: 600; color: #1a73e8; }
+    .sidebar-actions { display: flex; flex-direction: column; gap: 8px; }
+    .sidebar-actions .btn { width: 100%; text-align: center; font-size: 12px; padding: 8px 12px; }
+    .sidebar-alert { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="sidebar-container">
+    <div class="sidebar-header">
+      <h2>ContactSync</h2>
+      <p>Quick Access Panel</p>
+    </div>
+
+    <div id="sidebar-alert" class="sidebar-alert"></div>
+
+    <button class="btn btn-primary" style="width:100%;margin-bottom:16px;" onclick="openFullDashboard()">
+      Open Full Dashboard
+    </button>
+
+    <div class="mini-overview" id="mini-overview">
+      <div style="text-align:center;color:#888;font-size:12px;">Loading...</div>
+    </div>
+
+    <div class="section-title" style="font-size:14px;">Quick Actions</div>
+    <div class="sidebar-actions">
+      <button class="btn btn-primary" onclick="sidebarAction('scanDataSiswa')">Scan DataSiswa</button>
+      <button class="btn btn-primary" onclick="sidebarAction('validateContacts')">Validate</button>
+      <button class="btn btn-primary" onclick="sidebarAction('previewSync')">Preview Sync</button>
+      <button class="btn btn-success" onclick="sidebarAction('runSync')">Run Sync</button>
+    </div>
+  </div>
+
+  <script>
+    function openFullDashboard() {
+      google.script.run.openDashboard();
+    }
+
+    function loadMiniOverview() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          var el = document.getElementById('mini-overview');
+          if (!el) return;
+          if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch(e) { return; }
+          }
+          var html = '';
+          html += '<div class="mini-stat"><span class="mini-stat-label">Total Contacts</span><span class="mini-stat-value">' + (data.totalContacts || 0) + '</span></div>';
+          html += '<div class="mini-stat"><span class="mini-stat-label">Synced</span><span class="mini-stat-value">' + (data.synced || 0) + '</span></div>';
+          html += '<div class="mini-stat"><span class="mini-stat-label">Pending</span><span class="mini-stat-value">' + (data.pending || 0) + '</span></div>';
+          html += '<div class="mini-stat"><span class="mini-stat-label">Errors</span><span class="mini-stat-value">' + (data.errors || 0) + '</span></div>';
+          el.innerHTML = html;
+        })
+        .withFailureHandler(function(err) {
+          var el = document.getElementById('mini-overview');
+          if (el) el.innerHTML = '<div style="color:#c5221f;font-size:12px;">Failed to load overview</div>';
+        })
+        .getOverviewData();
+    }
+
+    function sidebarAction(actionName) {
+      var alertEl = document.getElementById('sidebar-alert');
+      if (alertEl) {
+        alertEl.innerHTML = '<div class="alert alert-info" style="font-size:12px;">Running ' + actionName + '...</div>';
+      }
+      var btns = document.querySelectorAll('.btn');
+      for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          var data = result;
+          if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch(e) {}
+          }
+          var msg = (data && data.message) ? data.message : actionName + ' completed';
+          if (alertEl) {
+            alertEl.innerHTML = '<div class="alert alert-success" style="font-size:12px;">' + msg + '</div>';
+          }
+          for (var i = 0; i < btns.length; i++) btns[i].disabled = false;
+          loadMiniOverview();
+        })
+        .withFailureHandler(function(err) {
+          if (alertEl) {
+            alertEl.innerHTML = '<div class="alert alert-error" style="font-size:12px;">' + actionName + ' failed: ' + err.message + '</div>';
+          }
+          for (var i = 0; i < btns.length; i++) btns[i].disabled = false;
+        })[actionName]();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadMiniOverview();
+    });
+  </script>
+</body>
+</html>

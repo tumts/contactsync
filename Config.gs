@@ -15,6 +15,7 @@ var CONFIG_DEFAULTS = {
   DEFAULT_ORGANIZATION: 'MTs Al Amin',
   DEFAULT_GROUP_NAME: 'Siswa MTs Al Amin',
   NAMING_PRESET: '1',
+  DEFAULT_STUDENT_STATUS: 'aktif',
   PARENT_CONTACT_MODE: 'consolidated',
   DRY_RUN_DEFAULT: 'true',
   DEBUG_MODE: 'false',

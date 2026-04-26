@@ -3,12 +3,14 @@
  */
 
 var CONTACTS_HEADERS = [
-  'id', 'fullName', 'givenName', 'familyName', 'emailPrimary', 'emailSecondary',
-  'phonePrimary', 'phoneSecondary', 'organization', 'jobTitle', 'classLabel',
-  'yearLabel', 'address', 'notes', 'parentName', 'parentPhone', 'parentEmail',
-  'parentRole', 'relationshipLabel', 'groupName', 'googleResourceName',
-  'googleEtag', 'syncStatus', 'lastSyncedAt', 'lastError', 'sourceUpdatedAt',
-  'waPhoneStatus', 'waPhoneCheckedAt', 'namingPattern', 'syncPreviewAction', 'dedupeKey'
+  'id', 'fullName', 'givenName', 'familyName', 'middleName', 'namePrefix', 'nameSuffix',
+  'nickname', 'fileAs', 'emailPrimary', 'emailSecondary',
+  'phonePrimary', 'phoneSecondary', 'phoneLabel', 'organization', 'jobTitle', 'classLabel',
+  'yearLabel', 'studentStatus', 'address', 'notes', 'birthday', 'parentName', 'parentPhone',
+  'parentEmail', 'parentRole', 'relationshipLabel', 'groupName', 'labels',
+  'googleResourceName', 'googleEtag', 'syncStatus', 'lastSyncedAt', 'lastError',
+  'sourceUpdatedAt', 'waPhoneStatus', 'waPhoneCheckedAt', 'namingPattern',
+  'syncPreviewAction', 'dedupeKey'
 ];
 
 var SYNCLOG_HEADERS = [
