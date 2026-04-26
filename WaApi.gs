@@ -563,6 +563,10 @@ function checkAllContactNumbers() {
     });
   }
 
+  // Clear stale progress from other callers (checkNumbersByClass) to avoid
+  // resuming at the wrong index in this different phone list.
+  PropertiesService.getScriptProperties().deleteProperty('batchCheck_progress');
+
   var result = JSON.parse(batchCheckNumbers(phoneList));
 
   // Update Contacts sheet with WA status
@@ -699,6 +703,10 @@ function checkNumbersByClass(gradeFilter, rombelFilter) {
       remainingToday: remaining
     });
   }
+
+  // Clear stale progress from other callers (checkAllContactNumbers) to avoid
+  // resuming at the wrong index in this different phone list.
+  PropertiesService.getScriptProperties().deleteProperty('batchCheck_progress');
 
   var result = JSON.parse(batchCheckNumbers(phoneList));
 
