@@ -7,32 +7,15 @@ ContactSync berjalan sebagai **project terpisah** dari SiswaHub, di spreadsheet 
 ## Arsitektur  
   
 ```mermaid  
-graph TD  
-    subgraph "Spreadsheet SiswaHub"  
-        A1["Sheet: DataSiswa"]  
-        A2["Sheet: DataWali"]  
-        A3["Sheet: AppSettings"]  
-    end  
+graph LR  
+    SiswaHub["Spreadsheet SiswaHub\n(DataSiswa, DataWali, AppSettings)"]  
+    ContactSync["Spreadsheet ContactSync\n(Config, Contacts, SyncLog, Duplicates)"]  
+    GContacts["Google Contacts\n(Akun Pengguna)"]  
+    GoWA["go-whatsapp-web-multidevice\n(GoWA API Server)"]  
   
-    subgraph "Spreadsheet ContactSync"  
-        B1["Sheet: Config"]  
-        B2["Sheet: Contacts"]  
-        B3["Sheet: SyncLog"]  
-        B4["Sheet: Duplicates"]  
-    end  
-  
-    subgraph "Google Contacts"  
-        C["Akun Pengguna"]  
-    end  
-  
-    subgraph "go-whatsapp-web-multidevice"  
-        D["GoWA API Server"]  
-    end  
-  
-    B2 -->|"READ (openById)"| A1  
-    B2 -->|"READ"| A2  
-    B2 -->|"SYNC (People API)"| C  
-    B2 -->|"CHECK (GoWA API)"| D  
+    SiswaHub -->|"READ (openById)"| ContactSync  
+    ContactSync -->|"SYNC (People API)"| GContacts  
+    ContactSync -->|"CHECK (GoWA API)"| GoWA
 ```  
   
 ## Fitur Utama  
