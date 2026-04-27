@@ -280,17 +280,19 @@ function checkWhatsAppNumber(phone) {
         JSON.stringify(body).substring(0, 500));
     }
 
-    if (code === 200 && (!body.code || Number(body.code) === 200)) {
+    if (code === 200 && (!body.code || body.code === 200 || body.code === '200' || String(body.code).toUpperCase() === 'SUCCESS')) {
       var isRegistered = false;
       if (body.results) {
-        if (typeof body.results.is_registered !== 'undefined') {
-          isRegistered = !!body.results.is_registered;
-        } else if (typeof body.results.registered !== 'undefined') {
-          isRegistered = !!body.results.registered;
-        } else if (body.results.jid) {
-          isRegistered = true;
-        } else if (typeof body.results === 'boolean') {
-          isRegistered = body.results;
+        if (typeof body.results.is_on_whatsapp !== 'undefined') {  
+          isRegistered = !!body.results.is_on_whatsapp;  
+        } else if (typeof body.results.is_registered !== 'undefined') {  
+          isRegistered = !!body.results.is_registered;  
+        } else if (typeof body.results.registered !== 'undefined') {  
+          isRegistered = !!body.results.registered;  
+        } else if (body.results.jid) {  
+          isRegistered = true;  
+        } else if (typeof body.results === 'boolean') {  
+          isRegistered = body.results;  
         }
       }
       return {
