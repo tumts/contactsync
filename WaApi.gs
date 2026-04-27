@@ -204,14 +204,16 @@ function getWaUserInfo(phone) {
     var code = response.getResponseCode();
     var body = JSON.parse(response.getContentText());
 
-    if (code === 200 && body.results) {
-      return {
-        pushName: body.results.push_name || body.results.pushName || '',
-        verifiedName: body.results.verified_name || body.results.verifiedName || '',
-        status: body.results.status || '',
-        pictureId: body.results.picture_id || ''
-      };
-    }
+if (code === 200 && body.results) {  
+  var userData = (body.results.data && body.results.data[0]) ? body.results.data[0] : body.results;  
+  return {  
+    pushName: userData.name || userData.push_name || userData.pushName || '',  
+    verifiedName: userData.verified_name || userData.verifiedName || '',  
+    status: userData.status || '',  
+    pictureId: userData.picture_id || '',  
+    devices: userData.devices || []  
+  };  
+}
   } catch (e) {
     // User info is optional, don't fail
   }
