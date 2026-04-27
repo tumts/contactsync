@@ -33,6 +33,11 @@ function buildFetchOptions(method, payload) {
     options.headers['Authorization'] = 'Basic ' + Utilities.base64Encode(user + ':' + pass);
   }
 
+  var deviceId = config.WA_API_DEVICE_ID || '';
+  if (deviceId) {
+    options.headers['X-Device-Id'] = deviceId;
+  }
+
   return options;
 }
 
@@ -268,15 +273,25 @@ function checkWhatsAppNumber(phone) {
     var code = response.getResponseCode();
     var body = JSON.parse(response.getContentText());
 
-    if (code === 200 && body.code === 200) {
+    // Debug: log raw response for troubleshooting
+    var config2 = loadConfig();
+    if (config2.DEBUG_MODE === 'true') {
+      logAction(normalized, 'wa_debug', 'info', 
+        'Raw response code=' + code + ' body.code=' + body.code + ' body.message=' + body.message,
+        JSON.stringify(body).substring(0, 500));
+    }
+
+    if (code === 200 && (!body.code || Number(body.code) === 200)) {
       var isRegistered = false;
       if (body.results) {
         if (typeof body.results.is_registered !== 'undefined') {
-          isRegistered = body.results.is_registered;
+          isRegistered = !!body.results.is_registered;
         } else if (typeof body.results.registered !== 'undefined') {
-          isRegistered = body.results.registered;
+          isRegistered = !!body.results.registered;
         } else if (body.results.jid) {
           isRegistered = true;
+        } else if (typeof body.results === 'boolean') {
+          isRegistered = body.results;
         }
       }
       return {
@@ -285,7 +300,7 @@ function checkWhatsAppNumber(phone) {
         jid: (body.results && body.results.jid) ? body.results.jid : null
       };
     } else {
-      return { status: 'error', message: 'API returned code ' + code + ': ' + (body.message || response.getContentText()) };
+      return { status: 'error', message: 'API returned code ' + code + ' (body.code=' + body.code + '): ' + (body.message || response.getContentText()) };
     }
   } catch (e) {
     logAction('', 'waCheck', 'error', 'WA check failed for ' + normalized, e.toString());
