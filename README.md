@@ -4,30 +4,35 @@ Aplikasi Google Apps Script untuk sinkronisasi data siswa & orang tua dari Googl
   
 ContactSync berjalan sebagai **project terpisah** dari SiswaHub, di spreadsheet sendiri, tetapi membaca data sumber dari spreadsheet SiswaHub via `openById()`.  
 ```
-## Arsitektur
-┌─────────────────────────┐ ┌─────────────────────────┐
-│ Spreadsheet SiswaHub │ │ Spreadsheet ContactSync│
-│ (Data Populasi MTs │ READ │ (spreadsheet baru) │
-│ Al Amin 2026) │◄────────│ │
-│ │ │ Sheet: Config │
-│ Sheet: DataSiswa │ │ Sheet: Contacts │
-│ Sheet: DataWali │ │ Sheet: SyncLog │
-│ Sheet: AppSettings │ │ Sheet: Duplicates │
-└─────────────────────────┘ └──────────┬──────────────┘
-│
-│ SYNC (People API)
-▼
-┌─────────────────────────┐
-│ Google Contacts │
-│ (akun pengguna) │
-└──────────┬──────────────┘
-│
-│ CHECK (GoWA API)
-▼
-┌─────────────────────────┐
-│ go-whatsapp-web │
-│ -multidevice │
-└─────────────────────────┘
+## Arsitektur  
+  
+```mermaid  
+graph TD  
+    subgraph "Spreadsheet SiswaHub"  
+        A1["Sheet: DataSiswa"]  
+        A2["Sheet: DataWali"]  
+        A3["Sheet: AppSettings"]  
+    end  
+  
+    subgraph "Spreadsheet ContactSync"  
+        B1["Sheet: Config"]  
+        B2["Sheet: Contacts"]  
+        B3["Sheet: SyncLog"]  
+        B4["Sheet: Duplicates"]  
+    end  
+  
+    subgraph "Google Contacts"  
+        C["Akun Pengguna"]  
+    end  
+  
+    subgraph "go-whatsapp-web-multidevice"  
+        D["GoWA API Server"]  
+    end  
+  
+    B2 -->|"READ (openById)"| A1  
+    B2 -->|"READ"| A2  
+    B2 -->|"SYNC (People API)"| C  
+    B2 -->|"CHECK (GoWA API)"| D  
 ```
 
 ## Fitur Utama  
