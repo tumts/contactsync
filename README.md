@@ -6,17 +6,35 @@ ContactSync berjalan sebagai **project terpisah** dari SiswaHub, di spreadsheet 
   
 ## Arsitektur  
   
-```mermaid  
-graph LR  
-    SiswaHub["Spreadsheet SiswaHub\n(DataSiswa, DataWali, AppSettings)"]  
-    ContactSync["Spreadsheet ContactSync\n(Config, Contacts, SyncLog, Duplicates)"]  
-    GContacts["Google Contacts\n(Akun Pengguna)"]  
-    GoWA["go-whatsapp-web-multidevice\n(GoWA API Server)"]  
+## Arsitektur  
   
-    SiswaHub -->|"READ (openById)"| ContactSync  
-    ContactSync -->|"SYNC (People API)"| GContacts  
-    ContactSync -->|"CHECK (GoWA API)"| GoWA
 ```  
+┌───────────────────────────┐       ┌───────────────────────────┐  
+│   Spreadsheet SiswaHub    │       │  Spreadsheet ContactSync  │  
+│   (Data Populasi MTs      │ READ  │    (spreadsheet baru)     │  
+│    Al Amin 2026)          │◄──────│                           │  
+│                           │       │   Sheet: Config           │  
+│   Sheet: DataSiswa        │       │   Sheet: Contacts         │  
+│   Sheet: DataWali         │       │   Sheet: SyncLog          │  
+│   Sheet: AppSettings      │       │   Sheet: Duplicates       │  
+└───────────────────────────┘       └─────────────┬─────────────┘  
+                                                  │  
+                                                  │ SYNC  
+                                                  │ (People API)  
+                                                  ▼  
+                                    ┌───────────────────────────┐  
+                                    │      Google Contacts      │  
+                                    │     (akun pengguna)       │  
+                                    └─────────────┬─────────────┘  
+                                                  │  
+                                                  │ CHECK  
+                                                  │ (GoWA API)  
+                                                  ▼  
+                                    ┌───────────────────────────┐  
+                                    │    go-whatsapp-web        │  
+                                    │    -multidevice           │  
+                                    └───────────────────────────┘  
+```
   
 ## Fitur Utama  
   
