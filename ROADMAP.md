@@ -142,6 +142,7 @@ Catatan keputusan yang sudah dibuat selama pengembangan:
 | `/user/check?phone=628xxx` | `GET` | `checkWhatsAppNumber()` | Cek nomor terdaftar di WA |  
 | `/user/info?phone=628xxx` | `GET` | `getWaUserInfo()` (planned) | Ambil pushName, verified name |  
 | `/user/avatar?phone=628xxx` | `GET` | `getWaUserAvatar()` (planned) | Ambil URL avatar |
+
 Referensi
 Google People API
 Google Contacts CSV Structure
