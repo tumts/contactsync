@@ -3,33 +3,35 @@
 Aplikasi Google Apps Script untuk sinkronisasi data siswa & orang tua dari Google Sheets ke Google Contacts menggunakan People API.  
   
 ContactSync berjalan sebagai **project terpisah** dari SiswaHub, di spreadsheet sendiri, tetapi membaca data sumber dari spreadsheet SiswaHub via `openById()`.  
-```
+
 ## Arsitektur  
   
 ```  
-┌─────────────────────────┐     ┌─────────────────────────┐  
-│  Spreadsheet SiswaHub   │     │ Spreadsheet ContactSync │  
-│  (Data Populasi MTs     │ READ│   (spreadsheet baru)    │  
-│   Al Amin 2026)         │◄────│                         │  
-│                         │     │  Sheet: Config          │  
-│  Sheet: DataSiswa       │     │  Sheet: Contacts        │  
-│  Sheet: DataWali        │     │  Sheet: SyncLog         │  
-│  Sheet: AppSettings     │     │  Sheet: Duplicates      │  
-└─────────────────────────┘     └──────────┬──────────────┘  
-                                           │  
-                                           │ SYNC (People API)  
-                                           ▼  
-                                ┌─────────────────────────┐  
-                                │    Google Contacts       │  
-                                │    (akun pengguna)       │  
-                                └──────────┬──────────────┘  
-                                           │  
-                                           │ CHECK (GoWA API)  
-                                           ▼  
-                                ┌─────────────────────────┐  
-                                │  go-whatsapp-web         │  
-                                │  -multidevice            │  
-                                └─────────────────────────┘  
+┌───────────────────────────┐       ┌───────────────────────────┐  
+│   Spreadsheet SiswaHub    │       │  Spreadsheet ContactSync  │  
+│   (Data Populasi MTs      │ READ  │    (spreadsheet baru)     │  
+│    Al Amin 2026)          │◄──────│                           │  
+│                           │       │   Sheet: Config           │  
+│   Sheet: DataSiswa        │       │   Sheet: Contacts         │  
+│   Sheet: DataWali         │       │   Sheet: SyncLog          │  
+│   Sheet: AppSettings      │       │   Sheet: Duplicates       │  
+└───────────────────────────┘       └─────────────┬─────────────┘  
+                                                  │  
+                                                  │ SYNC  
+                                                  │ (People API)  
+                                                  ▼  
+                                    ┌───────────────────────────┐  
+                                    │      Google Contacts      │  
+                                    │     (akun pengguna)       │  
+                                    └─────────────┬─────────────┘  
+                                                  │  
+                                                  │ CHECK  
+                                                  │ (GoWA API)  
+                                                  ▼  
+                                    ┌───────────────────────────┐  
+                                    │    go-whatsapp-web        │  
+                                    │    -multidevice           │  
+                                    └───────────────────────────┘  
 ```
 
 ## Fitur Utama  
