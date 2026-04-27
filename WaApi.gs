@@ -274,8 +274,7 @@ function checkWhatsAppNumber(phone) {
     var body = JSON.parse(response.getContentText());
 
     // Debug: log raw response for troubleshooting
-    var config2 = loadConfig();
-    if (config2.DEBUG_MODE === 'true') {
+    if (config.DEBUG_MODE === 'true') {
       logAction(normalized, 'wa_debug', 'info', 
         'Raw response code=' + code + ' body.code=' + body.code + ' body.message=' + body.message,
         JSON.stringify(body).substring(0, 500));
